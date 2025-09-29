@@ -5,20 +5,19 @@ use datafusion::logical_expr::{
     ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature,
     TypeSignature, Volatility,
 };
-use rdf_fusion_api::functions::BuiltinName;
-use rdf_fusion_common::DFResult;
 use rdf_fusion_encoding::typed_value::{TYPED_VALUE_ENCODING, TypedValueArrayBuilder};
 use rdf_fusion_encoding::{EncodingArray, TermEncoding};
+use rdf_fusion_extensions::functions::BuiltinName;
+use rdf_fusion_model::DFResult;
 use std::any::Any;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
+use std::hash::{Hash, Hasher};
 
-pub fn native_boolean_as_term() -> Arc<ScalarUDF> {
+pub fn native_boolean_as_term() -> ScalarUDF {
     let udf_impl = NativeBooleanAsTerm::new();
-    Arc::new(ScalarUDF::new_from_impl(udf_impl))
+    ScalarUDF::new_from_impl(udf_impl)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 struct NativeBooleanAsTerm {
     name: String,
     signature: Signature,
@@ -77,11 +76,16 @@ impl ScalarUDFImpl for NativeBooleanAsTerm {
 
         Ok(ColumnarValue::Array(builder.finish().into_array()))
     }
+}
 
-    fn hash_value(&self) -> u64 {
-        // Remove once https://github.com/apache/datafusion/pull/16977 is in release
-        let hasher = &mut DefaultHasher::new();
-        self.as_any().type_id().hash(hasher);
-        hasher.finish()
+impl Hash for NativeBooleanAsTerm {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_any().type_id().hash(state);
+    }
+}
+
+impl PartialEq for NativeBooleanAsTerm {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_any().type_id() == other.as_any().type_id()
     }
 }

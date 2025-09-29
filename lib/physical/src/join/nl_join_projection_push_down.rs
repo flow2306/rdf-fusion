@@ -3,8 +3,6 @@ use datafusion::common::alias::AliasGenerator;
 use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion};
 use datafusion::common::{JoinSide, JoinType};
 use datafusion::config::ConfigOptions;
-use datafusion::logical_expr::Volatility;
-use datafusion::physical_expr::ScalarFunctionExpr;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
@@ -12,7 +10,7 @@ use datafusion::physical_plan::joins::NestedLoopJoinExec;
 use datafusion::physical_plan::joins::utils::{ColumnIndex, JoinFilter};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-use rdf_fusion_common::DFResult;
+use rdf_fusion_model::DFResult;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -172,7 +170,7 @@ fn try_push_down_projection(
     config: &ConfigOptions,
     alias_generator: &AliasGenerator,
 ) -> DFResult<Transformed<(Arc<dyn ExecutionPlan>, JoinFilter)>> {
-    let expr = join_filter.expression().clone();
+    let expr = Arc::clone(join_filter.expression());
     let original_plan_schema = plan.schema();
     let mut rewriter = JoinFilterRewriter::new(
         join_side,
@@ -197,8 +195,8 @@ fn try_push_down_projection(
             .intermediate_column_indices
             .iter()
             .map(|ci| match ci.side {
-                JoinSide::Left => lhs_schema.fields[ci.index].clone(),
-                JoinSide::Right => rhs_schema.fields[ci.index].clone(),
+                JoinSide::Left => Arc::clone(&lhs_schema.fields[ci.index]),
+                JoinSide::Right => Arc::clone(&rhs_schema.fields[ci.index]),
                 JoinSide::None => unreachable!("Mark join not supported"),
             })
             .collect::<Fields>();
@@ -430,15 +428,11 @@ impl<'a> JoinFilterRewriter<'a> {
 }
 
 fn is_volatile(expr: &dyn PhysicalExpr) -> bool {
-    match expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
-        None => expr
+    expr.is_volatile_node()
+        || expr
             .children()
             .iter()
-            .map(|expr| is_volatile(expr.as_ref()))
-            .reduce(|lhs, rhs| lhs || rhs)
-            .unwrap_or(false),
-        Some(expr) => expr.fun().signature().volatility == Volatility::Volatile,
-    }
+            .any(|expr| is_volatile(expr.as_ref()))
 }
 
 #[cfg(test)]
@@ -448,15 +442,15 @@ mod test {
     use datafusion::common::{JoinSide, JoinType};
     use datafusion::functions::math::random;
     use datafusion::logical_expr::Operator;
-    use datafusion::physical_expr::PhysicalExpr;
     use datafusion::physical_expr::expressions::{Column, binary, lit};
+    use datafusion::physical_expr::{PhysicalExpr, ScalarFunctionExpr};
     use datafusion::physical_optimizer::PhysicalOptimizerRule;
     use datafusion::physical_plan::displayable;
     use datafusion::physical_plan::empty::EmptyExec;
     use datafusion::physical_plan::joins::NestedLoopJoinExec;
     use datafusion::physical_plan::joins::utils::{ColumnIndex, JoinFilter};
     use insta::assert_snapshot;
-    use rdf_fusion_common::DFResult;
+    use rdf_fusion_model::DFResult;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -779,6 +773,7 @@ mod test {
                 random(),
                 vec![],
                 FieldRef::new(Field::new("out", DataType::Float64, false)),
+                Arc::new(ConfigOptions::default()),
             )),
             join_schema,
         )?;

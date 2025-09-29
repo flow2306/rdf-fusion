@@ -5,8 +5,6 @@ use datafusion::logical_expr::{
     ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature,
     TypeSignature, Volatility,
 };
-use rdf_fusion_api::functions::BuiltinName;
-use rdf_fusion_common::DFResult;
 use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
 use rdf_fusion_encoding::plain_term::decoders::DefaultPlainTermDecoder;
 use rdf_fusion_encoding::typed_value::TYPED_VALUE_ENCODING;
@@ -15,17 +13,18 @@ use rdf_fusion_encoding::{
     EncodingArray, EncodingName, EncodingScalar, RdfFusionEncodings, TermDecoder,
     TermEncoder, TermEncoding,
 };
+use rdf_fusion_extensions::functions::BuiltinName;
+use rdf_fusion_model::DFResult;
 use std::any::Any;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
+use std::hash::{Hash, Hasher};
 
-pub fn with_typed_value_encoding(encodings: RdfFusionEncodings) -> Arc<ScalarUDF> {
+pub fn with_typed_value_encoding(encodings: RdfFusionEncodings) -> ScalarUDF {
     let udf_impl = WithTypedValueEncoding::new(encodings);
-    Arc::new(ScalarUDF::new_from_impl(udf_impl))
+    ScalarUDF::new_from_impl(udf_impl)
 }
 
 /// Transforms RDF Terms into the [TypedValueEncoding](rdf_fusion_encoding::typed_value::TypedValueEncoding).
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct WithTypedValueEncoding {
     /// The name of this function
     name: String,
@@ -138,11 +137,10 @@ impl ScalarUDFImpl for WithTypedValueEncoding {
             [ColumnarValue::Scalar(scalar)] => self.convert_scalar(encoding_name, scalar),
         }
     }
+}
 
-    fn hash_value(&self) -> u64 {
-        // Remove once https://github.com/apache/datafusion/pull/16977 is in release
-        let hasher = &mut DefaultHasher::new();
-        self.as_any().type_id().hash(hasher);
-        hasher.finish()
+impl Hash for WithTypedValueEncoding {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_any().type_id().hash(state);
     }
 }

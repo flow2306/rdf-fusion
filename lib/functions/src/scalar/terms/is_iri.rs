@@ -1,25 +1,18 @@
-//! This is just an exemplary "optimized" version of a SPARQL operation.
-
-use crate::scalar::sparql_op_impl::{create_typed_value_sparql_op_impl, SparqlOpImpl};
-use crate::scalar::{ScalarSparqlOp, UnaryArgs};
-use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, Decimal128Array, Float32Array, Float64Array, Int32Array, Int64Array,
-    NullArray, StringArray, StructArray, UnionArray,
+use crate::scalar::dispatch::dispatch_unary_typed_value;
+use crate::scalar::sparql_op_impl::{
+    ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
-use datafusion::arrow::buffer::ScalarBuffer;
-use datafusion::common::ScalarValue;
-use datafusion::logical_expr::{ColumnarValue, Volatility};
-use rdf_fusion_common::DFResult;
-use rdf_fusion_encoding::typed_value::{
-    TypedValueArray, TypedValueArrayBuilder, TypedValueEncoding, TypedValueEncodingField,
-};
-use rdf_fusion_encoding::{EncodingArray, EncodingScalar};
-use rdf_fusion_encoding::{EncodingDatum, TermEncoding};
-use std::sync::Arc;
-use rdf_fusion_api::functions::{BuiltinName, FunctionName};
+use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
+use rdf_fusion_encoding::typed_value::TypedValueEncoding;
+use rdf_fusion_extensions::functions::BuiltinName;
+use rdf_fusion_extensions::functions::FunctionName;
+use rdf_fusion_model::{ThinError, TypedValueRef};
 
-/// TODO
-#[derive(Debug)]
+/// Checks whether a given RDF term is an IRI.
+///
+/// # Relevant Resources
+/// - [SPARQL 1.1 - isIRI](https://www.w3.org/TR/sparql11-query/#func-isIRI)
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct IsIriSparqlOp;
 
 impl Default for IsIriSparqlOp {
@@ -38,14 +31,12 @@ impl IsIriSparqlOp {
 }
 
 impl ScalarSparqlOp for IsIriSparqlOp {
-    type Args<TEncoding: TermEncoding> = UnaryArgs<TEncoding>;
-
     fn name(&self) -> &FunctionName {
         &Self::NAME
     }
 
-    fn volatility(&self) -> Volatility {
-        Volatility::Immutable
+    fn signature(&self) -> ScalarSparqlOpSignature {
+        ScalarSparqlOpSignature::default_with_arity(SparqlOpArity::Fixed(1))
     }
 
     fn typed_value_encoding_op(

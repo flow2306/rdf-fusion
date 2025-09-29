@@ -1,11 +1,9 @@
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::Field;
+use datafusion::config::ConfigOptions;
 use datafusion::logical_expr::ScalarFunctionArgs;
 use datafusion::physical_plan::ColumnarValue;
 use insta::assert_snapshot;
-use rdf_fusion_api::functions::{
-    BuiltinName, FunctionName, RdfFusionFunctionArgs, RdfFusionFunctionRegistry,
-};
 use rdf_fusion_encoding::plain_term::decoders::DefaultPlainTermDecoder;
 use rdf_fusion_encoding::plain_term::{
     PLAIN_TERM_ENCODING, PlainTermArray, PlainTermArrayElementBuilder,
@@ -13,6 +11,9 @@ use rdf_fusion_encoding::plain_term::{
 use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
 use rdf_fusion_encoding::typed_value::TYPED_VALUE_ENCODING;
 use rdf_fusion_encoding::{EncodingArray, RdfFusionEncodings, TermDecoder, TermEncoding};
+use rdf_fusion_extensions::functions::{
+    BuiltinName, FunctionName, RdfFusionFunctionRegistry,
+};
 use rdf_fusion_functions::registry::DefaultRdfFusionFunctionRegistry;
 use rdf_fusion_model::vocab::xsd;
 use rdf_fusion_model::{BlankNode, Literal, NamedNode, Term};
@@ -40,10 +41,9 @@ fn invoke_udf(
     name: BuiltinName,
     arg: Arc<dyn Array>,
 ) -> String {
-    let udf = registry
-        .create_udf(FunctionName::Builtin(name), RdfFusionFunctionArgs::empty())
-        .unwrap();
+    let udf = registry.udf(&FunctionName::Builtin(name)).unwrap();
 
+    let options = Arc::new(ConfigOptions::default());
     let result = udf
         .invoke_with_args(ScalarFunctionArgs {
             arg_fields: vec![Arc::new(Field::new("arg", arg.data_type().clone(), true))],
@@ -54,6 +54,7 @@ fn invoke_udf(
                 true,
             )),
             args: vec![ColumnarValue::Array(arg)],
+            config_options: options,
         })
         .unwrap();
 
