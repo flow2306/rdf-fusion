@@ -9,7 +9,7 @@ use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayBuilder, TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayBuilder, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{DFResult, ThinError, TypedValueRef};
@@ -130,7 +130,7 @@ fn invoke_typed_value_array(array: &TypedValueArray) -> DFResult<ArrayRef> {
     }
 
     // The regular path must distinguish between Null and Non-null values.
-    let mut result = TypedValueArrayBuilder::default();
+    let mut result = TypedValueArrayElementBuilder::default();
     for type_id in parts.array.type_ids() {
         if *type_id == TypedValueEncodingField::Null.type_id() {
             result.append_null()?;
