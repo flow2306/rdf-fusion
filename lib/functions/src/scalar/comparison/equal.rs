@@ -3,7 +3,7 @@ use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::typed_value::{TypedValueArrayBuilder, TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueArrayBuilder, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{AResult, ThinError, TypedValueRef};
@@ -84,7 +84,7 @@ fn try_equals_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>) -> AResul
 
     let result = eq(lhs_parts.integers, rhs_parts.integers).expect("Arrays have the same type and length");
 
-    let mut array_builder = TypedValueArrayBuilder::default();
+    let mut array_builder = TypedValueArrayElementBuilder::default();
     for value in result.values() {
         array_builder.append_boolean(value.into())?;
     }
