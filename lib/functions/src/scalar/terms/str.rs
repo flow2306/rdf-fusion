@@ -3,7 +3,7 @@ use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_plain_term_sparql_op_impl,
     create_typed_value_sparql_op_impl,
 };
-use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
+use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
 use datafusion::arrow::array::{Array, StringArray, UInt8Array};
 use datafusion::logical_expr::ColumnarValue;
 use itertools::repeat_n;
@@ -11,11 +11,11 @@ use rdf_fusion_encoding::plain_term::{
     PlainTermArray, PlainTermArrayBuilder, PlainTermEncoding, PlainTermEncodingField,
     PlainTermType,
 };
-use rdf_fusion_encoding::typed_value::TypedValueEncoding;
+use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding};
 use rdf_fusion_encoding::{EncodingArray, EncodingDatum, EncodingScalar};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use rdf_fusion_model::ThinError;
+use rdf_fusion_model::{AResult, ThinError};
 use rdf_fusion_model::vocab::xsd;
 use rdf_fusion_model::{SimpleLiteral, TypedValue, TypedValueRef};
 use std::sync::Arc;
@@ -50,6 +50,10 @@ impl ScalarSparqlOp for StrSparqlOp {
         &self,
     ) -> Option<Box<dyn ScalarSparqlOpImpl<TypedValueEncoding>>> {
         Some(create_typed_value_sparql_op_impl(|args| {
+            if let Some(result) = try_str_fast_path(&args)?{
+                return Ok(result);
+            }
+
             dispatch_unary_owned_typed_value(
                 &args.args[0],
                 |value| {
@@ -130,4 +134,128 @@ fn impl_str_plain_term(array: &PlainTermArray) -> PlainTermArray {
     PlainTermArrayBuilder::new(Arc::new(term_types), value)
         .with_data_types(Arc::new(data_types))
         .finish()
+}
+
+fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
+    -> AResult<Option<ColumnarValue>> {
+    let col = args.args[0].to_array();
+    let parts = col.parts_as_ref();
+
+    let mut builder = TypedValueArrayElementBuilder::default();
+
+    // Named nodes
+    if parts.array.len() == parts.named_nodes.len() {
+        for v in parts.named_nodes.iter() {
+            builder.append_string(v.expect("string representation").to_string().as_str(), None)?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+/*
+    // Blank nodes
+    if parts.array.len() == parts.blank_nodes.len() {
+        for v in parts.blank_nodes.iter() {
+            builder.append_string(v.to_string().as_str(), None)?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Strings (Simple + Language Literals)
+    // TODO: check if language tag can be specified
+    if parts.array.len() == parts.strings.len() {
+        for s in parts.strings.iter() {
+            builder.append_string(s.to_string().as_str(), None)??;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Booleans
+    if parts.array.len() == parts.booleans.len() {
+        for b in parts.booleans.iter() {
+            builder.append_string(b.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Numerics: floats
+    if parts.array.len() == parts.floats.len() {
+        for f in parts.floats.iter() {
+            builder.append_string(f.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Numerics: doubles
+    if parts.array.len() == parts.doubles.len() {
+        for f in parts.doubles.iter() {
+            builder.append_string(f.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Numerics: decimals
+    if parts.array.len() == parts.decimals.len() {
+        for d in parts.decimals.iter() {
+            builder.append_string(d.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Numerics: ints
+    if parts.array.len() == parts.ints.len() {
+        for i in parts.ints.iter() {
+            builder.append_string(i.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Numerics: integers (i64)
+    if parts.array.len() == parts.integers.len() {
+        for i in parts.integers.iter() {
+            builder.append_string(i.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // DateTime
+    if parts.array.len() == parts.date_times.len() {
+        for dt in parts.date_times.iter() {
+            builder.append_string(dt.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Time
+    if parts.array.len() == parts.times.len() {
+        for t in parts.times.iter() {
+            builder.append_string(t.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Date
+    if parts.array.len() == parts.dates.len() {
+        for d in parts.dates.iter() {
+            builder.append_string(d.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Duration
+    if parts.array.len() == parts.durations.len() {
+        for dur in parts.durations.iter() {
+            builder.append_string(dur.to_string())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }
+
+    // Other literals
+    if parts.array.len() == parts.other_literals.len() {
+        for ol in parts.other_literals.iter() {
+            builder.append_string(ol.value().to_owned())?;
+        }
+        return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
+    }*/
+
+    // Kein homogener Typ → kein Fast Path möglich
+    Ok(None)
 }
