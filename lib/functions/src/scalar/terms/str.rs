@@ -4,7 +4,7 @@ use crate::scalar::sparql_op_impl::{
     create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use datafusion::arrow::array::{Array, StringArray, UInt8Array};
+use datafusion::arrow::array::{Array, ArrayRef, StringArray, UInt8Array};
 use datafusion::logical_expr::ColumnarValue;
 use itertools::repeat_n;
 use rdf_fusion_encoding::plain_term::{
@@ -143,6 +143,16 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
 
     let mut builder = TypedValueArrayElementBuilder::default();
 
+    if parts.array.len() == parts.named_nodes.len() {
+        let utf8_arr = Arc::new(parts.named_nodes.clone()) as ArrayRef;
+        return Ok(Some(utf8_arr.into()));
+    }
+
+    if parts.array.len() == parts.blank_nodes.len() {
+        let utf8_arr = Arc::new(parts.blank_nodes.clone()) as ArrayRef;
+        return Ok(Some(utf8_arr.into()));
+    }
+/*
     // Named nodes
     if parts.array.len() == parts.named_nodes.len() {
         for v in parts.named_nodes.iter() {
@@ -150,7 +160,7 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
         }
         return Ok(Some(ColumnarValue::Array(builder.finish().into_array())));
     }
-/*
+
     // Blank nodes
     if parts.array.len() == parts.blank_nodes.len() {
         for v in parts.blank_nodes.iter() {
