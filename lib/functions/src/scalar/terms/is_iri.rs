@@ -4,15 +4,14 @@ use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::common::ScalarValue;
 use datafusion::logical_expr::ColumnarValue;
 use rdf_fusion_encoding::{EncodingArray, EncodingDatum, EncodingScalar};
-use crate::scalar::dispatch::dispatch_unary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
-use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayBuilder, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
+use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
+use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use rdf_fusion_model::{DFResult, ThinError, TypedValueRef};
+use rdf_fusion_model::{DFResult};
 
 /// Checks whether a given RDF term is an IRI.
 ///

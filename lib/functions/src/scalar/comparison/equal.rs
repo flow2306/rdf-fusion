@@ -3,14 +3,13 @@ use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::typed_value::{TypedValueArrayBuilder, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{AResult, ThinError, TypedValueRef};
 use std::cmp::Ordering;
-use datafusion::arrow::array::{Array, BooleanArray};
+use datafusion::arrow::array::{Array};
 use datafusion::arrow::compute::kernels::cmp::eq;
-use datafusion::common::ScalarValue;
 use datafusion::logical_expr::ColumnarValue;
 use rdf_fusion_encoding::EncodingArray;
 
