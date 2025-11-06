@@ -139,5 +139,5 @@ fn invoke_typed_value_array(array: &TypedValueArray) -> DFResult<ArrayRef> {
         }
     }
 
-    Ok(result.finish().into_array())
+    Ok(result.finish().into_array_ref())
 }

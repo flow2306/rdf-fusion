@@ -88,5 +88,5 @@ fn try_equals_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>) -> AResul
         array_builder.append_boolean(value.into())?;
     }
 
-    Ok(Some(ColumnarValue::Array(array_builder.finish().into_array())))
+    Ok(Some(ColumnarValue::Array(array_builder.finish().into_array_ref())))
 }
