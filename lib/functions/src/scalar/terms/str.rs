@@ -11,7 +11,7 @@ use rdf_fusion_encoding::plain_term::{
     PlainTermArray, PlainTermArrayBuilder, PlainTermEncoding, PlainTermEncodingField,
     PlainTermType,
 };
-use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_encoding::{EncodingArray, EncodingDatum, EncodingScalar};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
@@ -145,7 +145,11 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
 
     if parts.array.len() == parts.named_nodes.len() {
         let utf8_arr = Arc::clone(parts.array.child(TypedValueEncodingField::NamedNode.type_id())) as ArrayRef;
-        return Ok(Some(utf8_arr.into()));
+        let mut array_builder = TypedValueArrayElementBuilder::default();
+        for value in utf8_arr.as_any().downcast_ref::<StringArray>().expect("Expected a StringArray").iter() {
+            array_builder.append_string(value.unwrap(), None)?;
+        }
+        return Ok(Some(ColumnarValue::Array(array_builder.finish().into_array_ref())));
     }
 
     if parts.array.len() == parts.blank_nodes.len() {
@@ -223,7 +227,7 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{create_default_builtin_udf, create_mixed_test_vector};
+    use crate::test_utils::{create_default_builtin_udf, create_mixed_test_vector, create_named_nodes_test_vector};
     use datafusion::dataframe;
     use datafusion::logical_expr::col;
     use insta::assert_snapshot;
@@ -232,7 +236,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_str_typed_value() {
-        let test_vector = create_mixed_test_vector();
+        let test_vector = create_named_nodes_test_vector();
         let udf = create_default_builtin_udf(BuiltinName::Str);
 
         let input = dataframe!(
@@ -246,12 +250,12 @@ mod tests {
         assert_snapshot!(
             result.to_string().await.unwrap(),
             @r"
-        +--------------------------------------+-------------------------------------------------------+
-        | input                                | STR(?table?.input)                                    |
-        +--------------------------------------+-------------------------------------------------------+
-        | {named_node=http://example.com/test} | {string={value: http://example.com/test, language: }} |
-        | {decimal=1000.0000000000000000}      | {string={value: 10, language: }}                      |
-        +--------------------------------------+-------------------------------------------------------+
+        +---------------------------------------+--------------------------------------------------------+
+        | input                                 | STR(?table?.input)                                     |
+        +---------------------------------------+--------------------------------------------------------+
+        | {named_node=http://example.com/test1} | {string={value: http://example.com/test1, language: }} |
+        | {named_node=http://example.com/test2} | {string={value: http://example.com/test2, language: }} |
+        +---------------------------------------+--------------------------------------------------------+
         "
         )
     }

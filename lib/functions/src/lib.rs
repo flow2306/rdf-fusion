@@ -62,6 +62,18 @@ mod test_utils {
         test_vector.finish()
     }
 
+    /// Creates a test vector with only named notes
+    pub(crate) fn create_named_nodes_test_vector() -> TypedValueArray {
+        let mut test_vector = TypedValueArrayElementBuilder::default();
+        test_vector
+            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test1"))
+            .unwrap();
+        test_vector
+            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test2"))
+            .unwrap();
+        test_vector.finish()
+    }
+
     /// Creates an instance of the given builtin UDF.
     pub(crate) fn create_default_builtin_udf(name: BuiltinName) -> Arc<ScalarUDF> {
         let encodings = RdfFusionEncodings::new(
