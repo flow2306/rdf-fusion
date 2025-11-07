@@ -4,14 +4,14 @@ use crate::scalar::sparql_op_impl::{
     create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use datafusion::arrow::array::{Array, ArrayRef, StringArray, UInt8Array};
+use datafusion::arrow::array::{Array, ArrayRef, StringArray, StructArray, UInt8Array};
 use datafusion::logical_expr::ColumnarValue;
 use itertools::repeat_n;
 use rdf_fusion_encoding::plain_term::{
     PlainTermArray, PlainTermArrayBuilder, PlainTermEncoding, PlainTermEncodingField,
     PlainTermType,
 };
-use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueArrayBuilder, TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_encoding::{EncodingArray, EncodingDatum, EncodingScalar};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
@@ -145,11 +145,14 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
 
     if parts.array.len() == parts.named_nodes.len() {
         let utf8_arr = Arc::clone(parts.array.child(TypedValueEncodingField::NamedNode.type_id())) as ArrayRef;
-        let mut array_builder = TypedValueArrayElementBuilder::default();
-        for value in utf8_arr.as_any().downcast_ref::<StringArray>().expect("Expected a StringArray").iter() {
-            array_builder.append_string(value.unwrap(), None)?;
-        }
-        return Ok(Some(ColumnarValue::Array(array_builder.finish().into_array_ref())));
+        let language_arr = Arc::new(StringArray::new_null(parts.named_nodes.len()));
+        let strings = StructArray::new(
+            TypedValueEncoding::string_fields(),
+            vec![utf8_arr, language_arr],
+            None
+        );
+        let result = TypedValueArrayBuilder::new_with_single_type(TypedValueEncodingField::String.type_id(), parts.array.len())?.with_strings(Arc::new(strings)).finish();
+        return Ok(Some(ColumnarValue::Array(result.unwrap().into_array_ref())));
     }
 
     if parts.array.len() == parts.blank_nodes.len() {
