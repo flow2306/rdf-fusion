@@ -43,13 +43,11 @@ mod test_utils {
     use rdf_fusion_encoding::RdfFusionEncodings;
     use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
     use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
-    use rdf_fusion_encoding::typed_value::{
-        TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncodingRef,
-    };
+    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingRef};
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
-    use rdf_fusion_model::{Decimal, NamedNodeRef};
+    use rdf_fusion_model::{BlankNodeRef, Decimal, Float, NamedNodeRef};
     use std::sync::Arc;
 
     /// Creates a test vector with mixed types.
@@ -61,6 +59,58 @@ mod test_utils {
             .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test"))
             .unwrap();
         test_vector.append_decimal(Decimal::from(10)).unwrap();
+        test_vector.finish()
+    }
+
+    /// Creates a test vector with only named notes
+    pub(crate) fn create_named_nodes_test_vector() -> TypedValueArray {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
+        test_vector
+            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test1"))
+            .unwrap();
+        test_vector
+            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test2"))
+            .unwrap();
+        test_vector.finish()
+    }
+
+    /// Creates a test vector with only strings
+    pub(crate) fn create_strings_test_vector() -> TypedValueArray {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
+        test_vector
+            .append_string("String1", None)
+            .unwrap();
+        test_vector
+            .append_string("String2", None)
+            .unwrap();
+        test_vector.finish()
+    }
+
+    /// Creates a test vector with only blank notes
+    pub(crate) fn create_blank_nodes_test_vector() -> TypedValueArray {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
+        test_vector
+            .append_blank_node(BlankNodeRef::new_unchecked("test1"))
+            .unwrap();
+        test_vector
+            .append_blank_node(BlankNodeRef::new_unchecked("test2"))
+            .unwrap();
+        test_vector.finish()
+    }
+
+    /// Creates a test vector with only floats
+    pub(crate) fn create_floats_test_vector() -> TypedValueArray {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
+        test_vector
+            .append_float(Float::from(26.05))
+            .unwrap();
+        test_vector
+            .append_float(Float::from(1.10))
+            .unwrap();
         test_vector.finish()
     }
 
