@@ -40,26 +40,46 @@ pub mod scalar;
 mod test_utils {
     use crate::registry::DefaultRdfFusionFunctionRegistry;
     use datafusion::logical_expr::ScalarUDF;
-    use rdf_fusion_encoding::RdfFusionEncodings;
+    use rdf_fusion_encoding::{EncodingArray, RdfFusionEncodings, TermEncoding};
     use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
     use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
-    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingRef};
+    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField, TypedValueEncodingRef};
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
     use rdf_fusion_model::{BlankNodeRef, Decimal, Float, NamedNodeRef};
     use std::sync::Arc;
+    use datafusion::arrow;
+    use datafusion::arrow::array::{Array, BooleanArray};
 
     /// Creates a test vector with mixed types.
     pub(crate) fn create_mixed_test_vector(
         encoding: &TypedValueEncodingRef,
+        type_restriction: Option<TypedValueEncodingField>
     ) -> TypedValueArray {
         let mut test_vector = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
         test_vector
             .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test"))
             .unwrap();
         test_vector.append_decimal(Decimal::from(10)).unwrap();
-        test_vector.finish()
+        let vector = test_vector.finish();
+
+        match type_restriction {
+            None => vector,
+            Some(type_restriction) => {
+                let filter = vector.parts_as_ref().array.type_ids()
+                    .iter().map(|tid| Some(*tid == type_restriction.type_id()))
+                    .collect::<BooleanArray>();
+                let array = vector.into_array_ref();
+               let filtered = arrow::compute::filter(&array, &filter).unwrap();
+
+                if filtered.is_empty() {
+                    panic!("Test vector is empty")
+                }
+
+                encoding.try_new_array(filtered).unwrap()
+            }
+        }
     }
 
     /// Creates a test vector with only named notes

@@ -294,14 +294,14 @@ mod tests {
     use datafusion::logical_expr::col;
     use insta::assert_snapshot;
     use rdf_fusion_encoding::EncodingArray;
-    use rdf_fusion_encoding::typed_value::TypedValueEncoding;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
     use rdf_fusion_extensions::functions::BuiltinName;
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn test_str_typed_value() {
+    async fn test_str_mixed() {
         let encoding = Arc::new(TypedValueEncoding::default());
-        let test_vector = create_mixed_test_vector(&encoding);
+        let test_vector = create_mixed_test_vector(&encoding, None);
         let udf = create_default_builtin_udf(encoding, BuiltinName::Str);
 
         let input = dataframe!(
@@ -315,12 +315,38 @@ mod tests {
         assert_snapshot!(
             result.to_string().await.unwrap(),
             @r"
-        +---------------+-------------------------------------+
-        | input         | STR(?table?.input)                  |
-        +---------------+-------------------------------------+
-        | {float=26.05} | {string={value: 26.05, language: }} |
-        | {float=1.1}   | {string={value: 1.1, language: }}   |
-        +---------------+-------------------------------------+
+        +--------------------------------------+-------------------------------------------------------+
+        | input                                | STR(?table?.input)                                    |
+        +--------------------------------------+-------------------------------------------------------+
+        | {named_node=http://example.com/test} | {string={value: http://example.com/test, language: }} |
+        | {decimal=1000.0000000000000000}      | {string={value: 10, language: }}                      |
+        +--------------------------------------+-------------------------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_str_fast_path_named_node() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::NamedNode));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Str);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @r"
+        +--------------------------------------+-------------------------------------------------------+
+        | input                                | STR(?table?.input)                                    |
+        +--------------------------------------+-------------------------------------------------------+
+        | {named_node=http://example.com/test} | {string={value: http://example.com/test, language: }} |
+        +--------------------------------------+-------------------------------------------------------+
         "
         )
     }
