@@ -5,17 +5,19 @@ use crate::scalar::sparql_op_impl::{
 use crate::scalar::{
     ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity,
 };
+use datafusion::arrow::array::Array;
+use datafusion::arrow::compute::kernels::cmp::eq;
+use datafusion::logical_expr::ColumnarValue;
+use rdf_fusion_encoding::EncodingArray;
 use rdf_fusion_encoding::RdfFusionEncodings;
-use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding};
+use rdf_fusion_encoding::typed_value::{
+    TypedValueArrayElementBuilder, TypedValueEncoding,
+};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{AResult, ThinError, TypedValueRef};
 use std::cmp::Ordering;
 use std::sync::Arc;
-use datafusion::arrow::array::{Array};
-use datafusion::arrow::compute::kernels::cmp::eq;
-use datafusion::logical_expr::ColumnarValue;
-use rdf_fusion_encoding::EncodingArray;
 
 /// Implementation of the SPARQL `=` operator.
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -52,10 +54,10 @@ impl ScalarSparqlOp for EqualSparqlOp {
         Some(create_typed_value_sparql_op_impl(
             encodings.typed_value(),
             |args: ScalarSparqlOpArgs<TypedValueEncoding>| {
-                if let Some(result) = try_equals_fast_path(&args)?{
+                if let Some(result) = try_equals_fast_path(&args)? {
                     return Ok(result);
                 }
-                
+
                 dispatch_binary_typed_value(
                     &args.encoding,
                     &args.args[0],
@@ -75,7 +77,9 @@ impl ScalarSparqlOp for EqualSparqlOp {
     }
 }
 
-fn try_equals_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>) -> AResult<Option<ColumnarValue>>{
+fn try_equals_fast_path(
+    args: &ScalarSparqlOpArgs<TypedValueEncoding>,
+) -> AResult<Option<ColumnarValue>> {
     let lhs = args.args[0].to_array();
     let rhs = args.args[1].to_array();
     let lhs_parts = lhs.parts_as_ref();
@@ -90,12 +94,16 @@ fn try_equals_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>) -> AResul
         return Ok(None);
     }
 
-    let result = eq(lhs_parts.integers, rhs_parts.integers).expect("Arrays have the same type and length");
+    let result = eq(lhs_parts.integers, rhs_parts.integers)
+        .expect("Arrays have the same type and length");
 
-    let mut array_builder = TypedValueArrayElementBuilder::new(Arc::clone(&args.encoding));
+    let mut array_builder =
+        TypedValueArrayElementBuilder::new(Arc::clone(&args.encoding));
     for value in result.values() {
         array_builder.append_boolean(value.into())?;
     }
 
-    Ok(Some(ColumnarValue::Array(array_builder.finish().into_array_ref())))
+    Ok(Some(ColumnarValue::Array(
+        array_builder.finish().into_array_ref(),
+    )))
 }

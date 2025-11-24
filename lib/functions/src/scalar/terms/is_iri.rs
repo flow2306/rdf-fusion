@@ -1,18 +1,27 @@
-use std::sync::Arc;
-use datafusion::arrow::array::{ArrayRef, BooleanArray, Decimal128Array, Float32Array, Float64Array, Int32Array, Int64Array, NullArray, StringArray, StructArray, UnionArray};
-use datafusion::arrow::buffer::ScalarBuffer;
-use datafusion::common::ScalarValue;
-use datafusion::logical_expr::ColumnarValue;
-use crate::scalar::dispatch::dispatch_unary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
-use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::{EncodingArray, EncodingDatum, EncodingScalar, RdfFusionEncodings};
-use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField, TypedValueEncodingRef};
+use crate::scalar::{
+    ScalarSparqlOp, ScalarSparqlOpArgs, ScalarSparqlOpSignature, SparqlOpArity,
+};
+use datafusion::arrow::array::{
+    ArrayRef, BooleanArray, Decimal128Array, Float32Array, Float64Array, Int32Array,
+    Int64Array, NullArray, StringArray, StructArray, UnionArray,
+};
+use datafusion::arrow::buffer::ScalarBuffer;
+use datafusion::common::ScalarValue;
+use datafusion::logical_expr::ColumnarValue;
+use rdf_fusion_encoding::typed_value::{
+    TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding,
+    TypedValueEncodingField,
+};
+use rdf_fusion_encoding::{
+    EncodingArray, EncodingDatum, EncodingScalar, RdfFusionEncodings,
+};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use rdf_fusion_model::{DFResult, ThinError, TypedValueRef};
+use rdf_fusion_model::DFResult;
+use std::sync::Arc;
 
 /// Checks whether a given RDF term is an IRI.
 ///
@@ -52,21 +61,25 @@ impl ScalarSparqlOp for IsIriSparqlOp {
         Some(create_typed_value_sparql_op_impl(
             encodings.typed_value(),
             |args| match &args.args[0] {
-            EncodingDatum::Array(array) => {
-                let array = invoke_typed_value_array(array, &args)?;
-                Ok(ColumnarValue::Array(array))
-            }
-            EncodingDatum::Scalar(scalar, _) => {
-                let array = scalar.to_array(1)?;
-                let array_result = invoke_typed_value_array(&array, &args)?;
-                let scalar_result = ScalarValue::try_from_array(&array_result, 0)?;
-                Ok(ColumnarValue::Scalar(scalar_result))
-            }
-        }))
+                EncodingDatum::Array(array) => {
+                    let array = invoke_typed_value_array(array, &args)?;
+                    Ok(ColumnarValue::Array(array))
+                }
+                EncodingDatum::Scalar(scalar, _) => {
+                    let array = scalar.to_array(1)?;
+                    let array_result = invoke_typed_value_array(&array, &args)?;
+                    let scalar_result = ScalarValue::try_from_array(&array_result, 0)?;
+                    Ok(ColumnarValue::Scalar(scalar_result))
+                }
+            },
+        ))
     }
 }
 
-fn invoke_typed_value_array(array: &TypedValueArray, args: &ScalarSparqlOpArgs<TypedValueEncoding>) -> DFResult<ArrayRef> {
+fn invoke_typed_value_array(
+    array: &TypedValueArray,
+    args: &ScalarSparqlOpArgs<TypedValueEncoding>,
+) -> DFResult<ArrayRef> {
     let parts = array.parts_as_ref();
 
     // If we do not have nulls, we can simply scan and check the type ids.
@@ -128,7 +141,7 @@ fn invoke_typed_value_array(array: &TypedValueArray, args: &ScalarSparqlOpArgs<T
                     )),
                 ],
             )
-                .expect("Fields and type match"),
+            .expect("Fields and type match"),
         ));
     }
 

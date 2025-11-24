@@ -39,62 +39,70 @@ pub mod scalar;
 #[cfg(test)]
 mod test_utils {
     use crate::registry::DefaultRdfFusionFunctionRegistry;
+    use datafusion::arrow;
+    use datafusion::arrow::array::{Array, BooleanArray};
     use datafusion::logical_expr::ScalarUDF;
-    use rdf_fusion_encoding::{EncodingArray, RdfFusionEncodings, TermEncoding};
     use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
     use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
-    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncodingField, TypedValueEncodingRef};
+    use rdf_fusion_encoding::typed_value::{
+        TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncodingField,
+        TypedValueEncodingRef,
+    };
+    use rdf_fusion_encoding::{EncodingArray, RdfFusionEncodings, TermEncoding};
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
-    use rdf_fusion_model::{BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float, NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration};
+    use rdf_fusion_model::{
+        BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float,
+        NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration,
+    };
     use std::sync::Arc;
-    use datafusion::arrow;
-    use datafusion::arrow::array::{Array, BooleanArray};
 
     /// Creates a test vector with mixed types.
     pub(crate) fn create_mixed_test_vector(
         encoding: &TypedValueEncodingRef,
-        type_restriction: Option<TypedValueEncodingField>
+        type_restriction: Option<TypedValueEncodingField>,
     ) -> TypedValueArray {
         let mut test_vector = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
         test_vector
             .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test"))
             .unwrap();
-        test_vector
-            .append_decimal(Decimal::from(10))
-            .unwrap();
-        test_vector
-            .append_string("String1", None)
-            .unwrap();
+        test_vector.append_decimal(Decimal::from(10)).unwrap();
+        test_vector.append_string("String1", None).unwrap();
         test_vector
             .append_blank_node(BlankNodeRef::new_unchecked("test1"))
             .unwrap();
-        test_vector
-            .append_float(Float::from(26.05))
-            .unwrap();
-        test_vector
-            .append_boolean(Boolean::from(true))
-            .unwrap();
+        test_vector.append_float(Float::from(26.05)).unwrap();
+        test_vector.append_boolean(Boolean::from(true)).unwrap();
         test_vector
             .append_date_time(DateTime::from("2025-11-24T12:34:56Z".parse().unwrap()))
             .unwrap();
         test_vector
-            .append_time(Time::new(Timestamp::new(Decimal::from(1), Some(TimezoneOffset::new_unchecked(60)))))
+            .append_time(Time::new(Timestamp::new(
+                Decimal::from(1),
+                Some(TimezoneOffset::new_unchecked(60)),
+            )))
             .unwrap();
         test_vector
             .append_date(Date::from("2025-11-24".parse().unwrap()))
             .unwrap();
         test_vector
-            .append_duration(Some(YearMonthDuration::new(7)), Some(DayTimeDuration::new(7)))
+            .append_duration(
+                Some(YearMonthDuration::new(7)),
+                Some(DayTimeDuration::new(7)),
+            )
             .unwrap();
         let vector = test_vector.finish();
 
         match type_restriction {
             None => vector,
             Some(type_restriction) => {
-                let filter = vector.parts_as_ref().array.type_ids()
-                    .iter().map(|tid| Some(*tid == type_restriction.type_id()))
+                let filter = vector
+                    .parts_as_ref()
+                    .array
+                    .type_ids()
+                    .iter()
+                    .map(|tid| Some(*tid == type_restriction.type_id()))
                     .collect::<BooleanArray>();
                 let array = vector.into_array_ref();
                 let filtered = arrow::compute::filter(&array, &filter).unwrap();
