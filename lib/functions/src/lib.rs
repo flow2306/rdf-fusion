@@ -43,11 +43,11 @@ mod test_utils {
     use rdf_fusion_encoding::{EncodingArray, RdfFusionEncodings, TermEncoding};
     use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
     use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
-    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField, TypedValueEncodingRef};
+    use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncodingField, TypedValueEncodingRef};
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
-    use rdf_fusion_model::{BlankNodeRef, Decimal, Float, NamedNodeRef};
+    use rdf_fusion_model::{BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float, NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration};
     use std::sync::Arc;
     use datafusion::arrow;
     use datafusion::arrow::array::{Array, BooleanArray};
@@ -61,7 +61,33 @@ mod test_utils {
         test_vector
             .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test"))
             .unwrap();
-        test_vector.append_decimal(Decimal::from(10)).unwrap();
+        test_vector
+            .append_decimal(Decimal::from(10))
+            .unwrap();
+        test_vector
+            .append_string("String1", None)
+            .unwrap();
+        test_vector
+            .append_blank_node(BlankNodeRef::new_unchecked("test1"))
+            .unwrap();
+        test_vector
+            .append_float(Float::from(26.05))
+            .unwrap();
+        test_vector
+            .append_boolean(Boolean::from(true))
+            .unwrap();
+        test_vector
+            .append_date_time(DateTime::from("2025-11-24T12:34:56Z".parse().unwrap()))
+            .unwrap();
+        test_vector
+            .append_time(Time::new(Timestamp::new(Decimal::from(1), Some(TimezoneOffset::new_unchecked(60)))))
+            .unwrap();
+        test_vector
+            .append_date(Date::from("2025-11-24".parse().unwrap()))
+            .unwrap();
+        test_vector
+            .append_duration(Some(YearMonthDuration::new(7)), Some(DayTimeDuration::new(7)))
+            .unwrap();
         let vector = test_vector.finish();
 
         match type_restriction {
@@ -71,7 +97,7 @@ mod test_utils {
                     .iter().map(|tid| Some(*tid == type_restriction.type_id()))
                     .collect::<BooleanArray>();
                 let array = vector.into_array_ref();
-               let filtered = arrow::compute::filter(&array, &filter).unwrap();
+                let filtered = arrow::compute::filter(&array, &filter).unwrap();
 
                 if filtered.is_empty() {
                     panic!("Test vector is empty")
@@ -80,58 +106,6 @@ mod test_utils {
                 encoding.try_new_array(filtered).unwrap()
             }
         }
-    }
-
-    /// Creates a test vector with only named notes
-    pub(crate) fn create_named_nodes_test_vector() -> TypedValueArray {
-        let encoding = Arc::new(TypedValueEncoding::default());
-        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
-        test_vector
-            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test1"))
-            .unwrap();
-        test_vector
-            .append_named_node(NamedNodeRef::new_unchecked("http://example.com/test2"))
-            .unwrap();
-        test_vector.finish()
-    }
-
-    /// Creates a test vector with only strings
-    pub(crate) fn create_strings_test_vector() -> TypedValueArray {
-        let encoding = Arc::new(TypedValueEncoding::default());
-        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
-        test_vector
-            .append_string("String1", None)
-            .unwrap();
-        test_vector
-            .append_string("String2", None)
-            .unwrap();
-        test_vector.finish()
-    }
-
-    /// Creates a test vector with only blank notes
-    pub(crate) fn create_blank_nodes_test_vector() -> TypedValueArray {
-        let encoding = Arc::new(TypedValueEncoding::default());
-        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
-        test_vector
-            .append_blank_node(BlankNodeRef::new_unchecked("test1"))
-            .unwrap();
-        test_vector
-            .append_blank_node(BlankNodeRef::new_unchecked("test2"))
-            .unwrap();
-        test_vector.finish()
-    }
-
-    /// Creates a test vector with only floats
-    pub(crate) fn create_floats_test_vector() -> TypedValueArray {
-        let encoding = Arc::new(TypedValueEncoding::default());
-        let mut test_vector = TypedValueArrayElementBuilder::new(encoding);
-        test_vector
-            .append_float(Float::from(26.05))
-            .unwrap();
-        test_vector
-            .append_float(Float::from(1.10))
-            .unwrap();
-        test_vector.finish()
     }
 
     /// Creates an instance of the given builtin UDF.
