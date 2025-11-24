@@ -22,7 +22,7 @@ use rdf_fusion_model::vocab::xsd;
 use rdf_fusion_model::{SimpleLiteral, TypedValue, TypedValueRef};
 use std::sync::Arc;
 use datafusion::arrow::compute;
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::{DataType};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct StrSparqlOp;
@@ -255,33 +255,8 @@ fn try_str_fast_path(args: &ScalarSparqlOpArgs<TypedValueEncoding>)
         let result = TypedValueArrayBuilder::new_with_single_type(Arc::clone(&args.encoding), TypedValueEncodingField::String.type_id(), parts.array.len())?.with_strings(Arc::new(strings)).finish();
         return Ok(Some(ColumnarValue::Array(result.unwrap().into_array_ref())));
     }
-/*
-    if parts.array.len() == parts.date_times.value.len() {
-        let utf8_arr = compute::cast(parts.date_times as &dyn Array, &DataType::Utf8)?;
-        return Ok(Some(utf8_arr.into()));
-    }
 
-    if parts.array.len() == parts.times.value.len() {
-        let utf8_arr = compute::cast(parts.times as &dyn Array, &DataType::Utf8)?;
-        return Ok(Some(utf8_arr.into()));
-    }
-
-    if parts.array.len() == parts.dates.value.len() {
-        let utf8_arr = compute::cast(parts.dates as &dyn Array, &DataType::Utf8)?;
-        return Ok(Some(utf8_arr.into()));
-    }
-
-    if parts.array.len() == parts.durations.months.len() {
-        let utf8_arr = compute::cast(parts.durations as &dyn Array, &DataType::Utf8)?;
-        return Ok(Some(utf8_arr.into()));
-    }
-
-    if parts.array.len() == parts.other_literals.value.len() {
-        let utf8_arr = Arc::new(StringArray::from_iter_values(
-            parts.other_literals.iter().map(|o| o.value())
-        )) as ArrayRef;
-        return Ok(Some(utf8_arr));
-    }*/
+    //TODO: add missing
 
     // no homogenous type → no fast path possible
     Ok(None)
@@ -315,12 +290,20 @@ mod tests {
         assert_snapshot!(
             result.to_string().await.unwrap(),
             @r"
-        +--------------------------------------+-------------------------------------------------------+
-        | input                                | STR(?table?.input)                                    |
-        +--------------------------------------+-------------------------------------------------------+
-        | {named_node=http://example.com/test} | {string={value: http://example.com/test, language: }} |
-        | {decimal=1000.0000000000000000}      | {string={value: 10, language: }}                      |
-        +--------------------------------------+-------------------------------------------------------+
+        +----------------------------------------------------------------+-------------------------------------------------------+
+        | input                                                          | STR(?table?.input)                                    |
+        +----------------------------------------------------------------+-------------------------------------------------------+
+        | {named_node=http://example.com/test}                           | {string={value: http://example.com/test, language: }} |
+        | {decimal=1000.0000000000000000}                                | {string={value: 10, language: }}                      |
+        | {string={value: String1, language: }}                          | {string={value: String1, language: }}                 |
+        | {blank_node=test1}                                             | {string={value: test1, language: }}                   |
+        | {float=26.05}                                                  | {string={value: 26.05, language: }}                   |
+        | {boolean=true}                                                 | {string={value: true, language: }}                    |
+        | {date_time={value: 6389958449600.0000000000000000, offset: 0}} | {string={value: 2025-11-24T12:34:56Z, language: }}    |
+        | {time={value: 100.0000000000000000, offset: 60}}               | {string={value: 01:00:01+01:00, language: }}          |
+        | {date={value: 6389953920000.0000000000000000, offset: }}       | {string={value: 2025-11-24, language: }}              |
+        | {duration={months: 7, seconds: 700.0000000000000000}}          | {string={value: P7MT7S, language: }}                  |
+        +----------------------------------------------------------------+-------------------------------------------------------+
         "
         )
     }
