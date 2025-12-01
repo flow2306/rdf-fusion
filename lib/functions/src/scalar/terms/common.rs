@@ -1,17 +1,33 @@
-use std::sync::Arc;
-use datafusion::arrow::array::{ArrayRef, BooleanArray, Decimal128Array, Float32Array, Float64Array, Int32Array, Int64Array, NullArray, StringArray, StructArray, UnionArray};
+use crate::scalar::ScalarSparqlOpArgs;
+use datafusion::arrow::array::{
+    ArrayRef, BooleanArray, Decimal128Array, Float32Array, Float64Array, Int32Array,
+    Int64Array, NullArray, StringArray, StructArray, UnionArray,
+};
 use datafusion::arrow::buffer::ScalarBuffer;
 use rdf_fusion_encoding::EncodingArray;
-use rdf_fusion_encoding::typed_value::{TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{
+    TypedValueArray, TypedValueArrayElementBuilder, TypedValueEncoding,
+    TypedValueEncodingField,
+};
 use rdf_fusion_model::DFResult;
-use crate::scalar::ScalarSparqlOpArgs;
+use std::sync::Arc;
 
 pub fn invoke_typed_value_array(
     array: &TypedValueArray,
     args: &ScalarSparqlOpArgs<TypedValueEncoding>,
-    target_type:TypedValueEncodingField,
+    target_type: TypedValueEncodingField,
+) -> DFResult<ArrayRef> {
+    invoke_typed_value_array_multi(array, args, &[target_type])
+}
+
+pub fn invoke_typed_value_array_multi(
+    array: &TypedValueArray,
+    args: &ScalarSparqlOpArgs<TypedValueEncoding>,
+    target_types: &[TypedValueEncodingField],
 ) -> DFResult<ArrayRef> {
     let parts = array.parts_as_ref();
+
+    let target_ids: Vec<i8> = target_types.iter().map(|t| t.type_id()).collect();
 
     // If we do not have nulls, we can simply scan and check the type ids.
     if parts.null_count == 0 {
@@ -19,15 +35,14 @@ pub fn invoke_typed_value_array(
             .array
             .type_ids()
             .iter()
-            .map(|type_id| Some(*type_id == target_type.type_id()))
+            .map(|type_id| Some(target_ids.contains(type_id)))
             .collect::<BooleanArray>();
 
         let type_ids = (0..results.len() as i32)
             .map(|_| TypedValueEncodingField::Boolean.type_id())
             .collect();
-        let offsets = (0..results.len() as i32)
-            .into_iter()
-            .collect::<ScalarBuffer<i32>>();
+
+        let offsets = (0..results.len() as i32).collect::<ScalarBuffer<i32>>();
 
         return Ok(Arc::new(
             UnionArray::try_new(
@@ -70,7 +85,7 @@ pub fn invoke_typed_value_array(
                     )),
                 ],
             )
-                .expect("Fields and type match"),
+            .expect("Fields and type match"),
         ));
     }
 
@@ -80,7 +95,7 @@ pub fn invoke_typed_value_array(
         if *type_id == TypedValueEncodingField::Null.type_id() {
             result.append_null()?;
         } else {
-            let boolean = *type_id == target_type.type_id();
+            let boolean = target_ids.contains(type_id);
             result.append_boolean(boolean.into())?;
         }
     }

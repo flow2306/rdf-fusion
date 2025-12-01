@@ -1,14 +1,14 @@
-use datafusion::common::ScalarValue;
-use datafusion::logical_expr::ColumnarValue;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
+use crate::scalar::terms::common::invoke_typed_value_array;
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::{EncodingDatum, EncodingScalar, RdfFusionEncodings};
+use datafusion::common::ScalarValue;
+use datafusion::logical_expr::ColumnarValue;
 use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::{EncodingDatum, EncodingScalar, RdfFusionEncodings};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use crate::scalar::terms::common::invoke_typed_value_array;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct IsBlankSparqlOp;
@@ -47,7 +47,7 @@ impl ScalarSparqlOp for IsBlankSparqlOp {
                     let array = invoke_typed_value_array(
                         array,
                         &args,
-                        TypedValueEncodingField::BlankNode
+                        TypedValueEncodingField::BlankNode,
                     )?;
                     Ok(ColumnarValue::Array(array))
                 }
@@ -56,7 +56,7 @@ impl ScalarSparqlOp for IsBlankSparqlOp {
                     let array_result = invoke_typed_value_array(
                         &array,
                         &args,
-                        TypedValueEncodingField::BlankNode
+                        TypedValueEncodingField::BlankNode,
                     )?;
                     let scalar_result = ScalarValue::try_from_array(&array_result, 0)?;
                     Ok(ColumnarValue::Scalar(scalar_result))

@@ -1,13 +1,14 @@
-use crate::scalar::dispatch::dispatch_unary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
+use crate::scalar::terms::common::invoke_typed_value_array_multi;
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::RdfFusionEncodings;
-use rdf_fusion_encoding::typed_value::TypedValueEncoding;
+use datafusion::common::ScalarValue;
+use datafusion::physical_plan::ColumnarValue;
+use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::{EncodingDatum, EncodingScalar, RdfFusionEncodings};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use rdf_fusion_model::{ThinError, TypedValueRef};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct IsLiteralSparqlOp;
@@ -41,19 +42,31 @@ impl ScalarSparqlOp for IsLiteralSparqlOp {
     ) -> Option<Box<dyn ScalarSparqlOpImpl<TypedValueEncoding>>> {
         Some(create_typed_value_sparql_op_impl(
             encodings.typed_value(),
-            |args| {
-                dispatch_unary_typed_value(
-                    &args.encoding,
-                    &args.args[0],
-                    |value| {
-                        let result = !matches!(
-                            value,
-                            TypedValueRef::NamedNode(_) | TypedValueRef::BlankNode(_)
-                        );
-                        Ok(TypedValueRef::BooleanLiteral(result.into()))
-                    },
-                    ThinError::expected,
-                )
+            |args| match &args.args[0] {
+                EncodingDatum::Array(array) => {
+                    let array = invoke_typed_value_array_multi(
+                        array,
+                        &args,
+                        &[
+                            TypedValueEncodingField::NamedNode,
+                            TypedValueEncodingField::BlankNode,
+                        ],
+                    )?;
+                    Ok(ColumnarValue::Array(array))
+                }
+                EncodingDatum::Scalar(scalar, _) => {
+                    let array = scalar.to_array(1)?;
+                    let array_result = invoke_typed_value_array_multi(
+                        &array,
+                        &args,
+                        &[
+                            TypedValueEncodingField::NamedNode,
+                            TypedValueEncodingField::BlankNode,
+                        ],
+                    )?;
+                    let scalar_result = ScalarValue::try_from_array(&array_result, 0)?;
+                    Ok(ColumnarValue::Scalar(scalar_result))
+                }
             },
         ))
     }

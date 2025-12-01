@@ -1,4 +1,5 @@
 mod bnode;
+mod common;
 mod datatype;
 mod iri;
 mod is_blank;
@@ -10,7 +11,6 @@ mod str;
 mod strdt;
 mod strlang;
 mod uuid;
-mod common;
 
 pub use bnode::BNodeSparqlOp;
 pub use datatype::DatatypeSparqlOp;
