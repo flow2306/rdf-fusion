@@ -3,6 +3,7 @@ mod greater_or_equal;
 mod greater_than;
 mod less_or_equal;
 mod less_than;
+mod common;
 
 pub use equal::EqualSparqlOp;
 pub use greater_or_equal::GreaterOrEqualSparqlOp;
