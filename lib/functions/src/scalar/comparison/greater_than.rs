@@ -1,16 +1,16 @@
+use crate::scalar::comparison::common::try_cmp_fast_path;
 use crate::scalar::dispatch::dispatch_binary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
-use rdf_fusion_encoding::{RdfFusionEncodings};
-use rdf_fusion_encoding::typed_value::{TypedValueEncoding};
+use datafusion::arrow::compute::kernels::cmp::gt;
+use rdf_fusion_encoding::RdfFusionEncodings;
+use rdf_fusion_encoding::typed_value::TypedValueEncoding;
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{ThinError, TypedValueRef};
 use std::cmp::Ordering;
-use datafusion::arrow::compute::kernels::cmp::gt;
-use crate::scalar::comparison::common::try_cmp_fast_path;
 
 /// Implementation of the SPARQL `>` operator.
 #[derive(Debug, Hash, PartialEq, Eq)]

@@ -1,11 +1,13 @@
-use std::sync::Arc;
+use crate::scalar::ScalarSparqlOpArgs;
 use datafusion::arrow::array::{Array, BooleanArray, Datum};
 use datafusion::arrow::error::ArrowError;
 use datafusion::logical_expr::ColumnarValue;
 use rdf_fusion_encoding::EncodingArray;
-use rdf_fusion_encoding::typed_value::{TypedValueArrayElementBuilder, TypedValueEncoding};
+use rdf_fusion_encoding::typed_value::{
+    TypedValueArrayElementBuilder, TypedValueEncoding,
+};
 use rdf_fusion_model::AResult;
-use crate::scalar::ScalarSparqlOpArgs;
+use std::sync::Arc;
 
 pub fn try_cmp_fast_path(
     args: &ScalarSparqlOpArgs<TypedValueEncoding>,
