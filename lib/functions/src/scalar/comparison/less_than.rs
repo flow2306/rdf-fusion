@@ -1,8 +1,10 @@
+use crate::scalar::comparison::common::try_cmp_fast_path;
 use crate::scalar::dispatch::dispatch_binary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
+use datafusion::arrow::compute::kernels::cmp::lt;
 use rdf_fusion_encoding::RdfFusionEncodings;
 use rdf_fusion_encoding::typed_value::TypedValueEncoding;
 use rdf_fusion_extensions::functions::BuiltinName;
@@ -45,6 +47,10 @@ impl ScalarSparqlOp for LessThanSparqlOp {
         Some(create_typed_value_sparql_op_impl(
             encodings.typed_value(),
             |args| {
+                if let Some(result) = try_cmp_fast_path(&args, lt)? {
+                    return Ok(result);
+                }
+
                 dispatch_binary_typed_value(
                     &args.encoding,
                     &args.args[0],
