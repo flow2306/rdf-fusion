@@ -6,6 +6,7 @@ mod cast_float;
 mod cast_int;
 mod cast_integer;
 mod cast_string;
+mod common;
 
 pub use cast_boolean::CastBooleanSparqlOp;
 pub use cast_datetime::CastDateTimeSparqlOp;
