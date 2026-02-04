@@ -24,6 +24,8 @@ enum UnaryScenario {
     AllInt,
     AllFloat,
     AllString,
+    MixedWithNulls,
+    AllNulls,
 }
 
 impl UnaryScenario {
@@ -122,6 +124,34 @@ impl UnaryScenario {
                     payload_builder.finish().into_array_ref(),
                 )]
             }
+            UnaryScenario::MixedWithNulls => {
+                let mut payload_builder = TypedValueArrayElementBuilder::new(Arc::clone(
+                    encodings.typed_value(),
+                ));
+
+                for i in 0..8192 {
+                    if i % 3 == 0 {
+                        payload_builder.append_null().unwrap();
+                    } else {
+                        payload_builder.append_integer(Integer::from(i)).unwrap();
+                    }
+                }
+
+                vec![ColumnarValue::Array(
+                    payload_builder.finish().into_array_ref(),
+                )]
+            }
+            UnaryScenario::AllNulls => {
+                let mut payload_builder = TypedValueArrayElementBuilder::new(Arc::clone(
+                    encodings.typed_value(),
+                ));
+                for _ in 0..8192 {
+                    payload_builder.append_null().unwrap();
+                }
+                vec![ColumnarValue::Array(
+                    payload_builder.finish().into_array_ref(),
+                )]
+            }
         }
     }
 }
@@ -166,6 +196,14 @@ fn bench_all(c: &mut Criterion) {
         ),
         (BuiltinName::CastString, vec![UnaryScenario::Mixed]),
         (BuiltinName::CastDateTime, vec![UnaryScenario::Mixed]),
+        (
+            BuiltinName::Bound,
+            vec![
+                UnaryScenario::Mixed,
+                UnaryScenario::MixedWithNulls,
+                UnaryScenario::AllNulls,
+            ],
+        ),
     ]);
 
     for (my_built_in, scenarios) in runs {
