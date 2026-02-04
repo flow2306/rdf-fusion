@@ -1,4 +1,5 @@
-use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::array::{Array, ArrayRef, PrimitiveArray};
+use datafusion::arrow::compute::sum;
 use datafusion::logical_expr::{AggregateUDF, Volatility, create_udaf};
 use datafusion::scalar::ScalarValue;
 use datafusion::{error::Result, physical_plan::Accumulator};
@@ -7,9 +8,10 @@ use rdf_fusion_encoding::typed_value::decoders::NumericTermValueDecoder;
 use rdf_fusion_encoding::typed_value::encoders::NumericTypedValueEncoder;
 use rdf_fusion_encoding::{EncodingScalar, TermDecoder, TermEncoder, TermEncoding};
 use rdf_fusion_extensions::functions::BuiltinName;
-use rdf_fusion_model::DFResult;
+use rdf_fusion_model::{DFResult, Double, Float};
 use rdf_fusion_model::{Integer, Numeric, NumericPair, ThinResult};
 use std::sync::Arc;
+use datafusion::arrow::datatypes::{Float32Type, Float64Type};
 
 pub fn sum_typed_value(encoding: TypedValueEncodingRef) -> AggregateUDF {
     let data_type = encoding.data_type().clone();
@@ -47,6 +49,29 @@ impl Accumulator for SparqlTypedValueSum {
         // TODO: Can we stop once we error?
 
         let arr = self.encoding.try_new_array(Arc::clone(&values[0]))?;
+
+        // TODO I need to somehow get a float array from the arr above so that I can apply the Arrow sum on it.
+        // fast path if values are floats
+        /* code to be changed so that we can achieve vectorization
+        if let Some(float64_array) = values[0].as_any().downcast_ref::<PrimitiveArray<Float64Type>>() {
+            if let Some(batch_sum) = sum(float64_array) {
+                if let Ok(Numeric::Double(current)) = self.sum {
+                    self.sum = Ok(Numeric::Double(current + Double::from(batch_sum)));
+                }
+            }
+            return Ok(());
+        }
+
+        if let Some(float32_array) = values[0].as_any().downcast_ref::<PrimitiveArray<Float32Type>>() {
+            if let Some(batch_sum) = sum(float32_array) {
+                if let Ok(Numeric::Float(current)) = self.sum {
+                    self.sum = Ok(Numeric::Float(current + Float::from(batch_sum)));
+                }
+            }
+            return Ok(());
+        }
+         */
+
         for value in NumericTermValueDecoder::decode_terms(&arr) {
             if let Ok(sum) = self.sum {
                 if let Ok(value) = value {
