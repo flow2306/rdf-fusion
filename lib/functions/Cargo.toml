@@ -37,3 +37,7 @@ harness = false
 [[bench]]
 name = "scalar_binary"
 harness = false
+
+[[bench]]
+name = "aggregates"
+harness = false
