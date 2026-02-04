@@ -72,6 +72,10 @@ fn bench_all_binary(c: &mut Criterion) {
         (BuiltinName::GreaterThan, vec![BinaryScenario::AllInt]),
         (BuiltinName::LessOrEqual, vec![BinaryScenario::AllInt]),
         (BuiltinName::LessThan, vec![BinaryScenario::AllInt]),
+        (BuiltinName::Add, vec![BinaryScenario::AllInt]),
+        (BuiltinName::Sub, vec![BinaryScenario::AllInt]),
+        (BuiltinName::Div, vec![BinaryScenario::AllInt]),
+        (BuiltinName::Mul, vec![BinaryScenario::AllInt]),
     ]);
 
     for (my_built_in, scenarios) in runs {
