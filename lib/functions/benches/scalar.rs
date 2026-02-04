@@ -125,8 +125,9 @@ impl UnaryScenario {
                 )]
             }
             UnaryScenario::MixedWithNulls => {
-                let mut payload_builder =
-                    TypedValueArrayElementBuilder::new(Arc::clone(encodings.typed_value()));
+                let mut payload_builder = TypedValueArrayElementBuilder::new(Arc::clone(
+                    encodings.typed_value(),
+                ));
 
                 for i in 0..8192 {
                     if i % 3 == 0 {
@@ -195,7 +196,14 @@ fn bench_all(c: &mut Criterion) {
         ),
         (BuiltinName::CastString, vec![UnaryScenario::Mixed]),
         (BuiltinName::CastDateTime, vec![UnaryScenario::Mixed]),
-        (BuiltinName::Bound, vec![UnaryScenario::Mixed, UnaryScenario::MixedWithNulls, UnaryScenario::AllNulls]),
+        (
+            BuiltinName::Bound,
+            vec![
+                UnaryScenario::Mixed,
+                UnaryScenario::MixedWithNulls,
+                UnaryScenario::AllNulls,
+            ],
+        ),
     ]);
 
     for (my_built_in, scenarios) in runs {
