@@ -1,4 +1,4 @@
-use datafusion::arrow::array::{Array, ArrayRef, PrimitiveArray};
+use datafusion::arrow::array::{Array, ArrayRef};
 use datafusion::arrow::compute::sum;
 use datafusion::logical_expr::{AggregateUDF, Volatility, create_udaf};
 use datafusion::scalar::ScalarValue;
@@ -8,10 +8,9 @@ use rdf_fusion_encoding::typed_value::decoders::NumericTermValueDecoder;
 use rdf_fusion_encoding::typed_value::encoders::NumericTypedValueEncoder;
 use rdf_fusion_encoding::{EncodingScalar, TermDecoder, TermEncoder, TermEncoding};
 use rdf_fusion_extensions::functions::BuiltinName;
-use rdf_fusion_model::{DFResult, Double, Float};
+use rdf_fusion_model::{DFResult, Float};
 use rdf_fusion_model::{Integer, Numeric, NumericPair, ThinResult};
 use std::sync::Arc;
-use datafusion::arrow::datatypes::{Float32Type, Float64Type};
 
 pub fn sum_typed_value(encoding: TypedValueEncodingRef) -> AggregateUDF {
     let data_type = encoding.data_type().clone();
@@ -50,28 +49,32 @@ impl Accumulator for SparqlTypedValueSum {
 
         let arr = self.encoding.try_new_array(Arc::clone(&values[0]))?;
 
-        // TODO I need to somehow get a float array from the arr above so that I can apply the Arrow sum on it.
-        // fast path if values are floats
-        /* code to be changed so that we can achieve vectorization
-        if let Some(float64_array) = values[0].as_any().downcast_ref::<PrimitiveArray<Float64Type>>() {
-            if let Some(batch_sum) = sum(float64_array) {
-                if let Ok(Numeric::Double(current)) = self.sum {
-                    self.sum = Ok(Numeric::Double(current + Double::from(batch_sum)));
+        // fast path if values are homogenous float
+        if arr.parts_as_ref().array.len() == arr.parts_as_ref().floats.len() {
+            if let Some(batch_sum) = sum(arr.parts_as_ref().floats) {
+                if let Ok(sum) = self.sum {
+                    self.sum = match NumericPair::with_casts_from(
+                        sum,
+                        Numeric::from(Float::from(batch_sum)),
+                    ) {
+                        NumericPair::Int(lhs, rhs) => {
+                            lhs.checked_add(rhs).map(Numeric::Int)
+                        }
+                        NumericPair::Integer(lhs, rhs) => {
+                            lhs.checked_add(rhs).map(Numeric::Integer)
+                        }
+                        NumericPair::Float(lhs, rhs) => Ok(Numeric::Float(lhs + rhs)),
+                        NumericPair::Double(lhs, rhs) => Ok(Numeric::Double(lhs + rhs)),
+                        NumericPair::Decimal(lhs, rhs) => {
+                            lhs.checked_add(rhs).map(Numeric::Decimal)
+                        }
+                    };
                 }
             }
             return Ok(());
         }
 
-        if let Some(float32_array) = values[0].as_any().downcast_ref::<PrimitiveArray<Float32Type>>() {
-            if let Some(batch_sum) = sum(float32_array) {
-                if let Ok(Numeric::Float(current)) = self.sum {
-                    self.sum = Ok(Numeric::Float(current + Float::from(batch_sum)));
-                }
-            }
-            return Ok(());
-        }
-         */
-
+        // proceed with fallback when data is not homogenous
         for value in NumericTermValueDecoder::decode_terms(&arr) {
             if let Ok(sum) = self.sum {
                 if let Ok(value) = value {
