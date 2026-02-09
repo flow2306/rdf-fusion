@@ -52,7 +52,10 @@ mod test_utils {
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
-    use rdf_fusion_model::{BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float, Integer, NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration};
+    use rdf_fusion_model::{
+        BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float, Integer,
+        NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration,
+    };
     use std::sync::Arc;
 
     /// Creates a test vector with mixed types.

@@ -91,7 +91,7 @@ mod tests {
             "input1" => test_vector[0].clone(),
             "input2" => test_vector[1].clone(),
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([
