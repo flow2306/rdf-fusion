@@ -52,10 +52,7 @@ mod test_utils {
     use rdf_fusion_extensions::functions::{
         BuiltinName, FunctionName, RdfFusionFunctionRegistry,
     };
-    use rdf_fusion_model::{
-        BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float,
-        NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration,
-    };
+    use rdf_fusion_model::{BlankNodeRef, Boolean, Date, DateTime, DayTimeDuration, Decimal, Float, Integer, NamedNodeRef, Time, Timestamp, TimezoneOffset, YearMonthDuration};
     use std::sync::Arc;
 
     /// Creates a test vector with mixed types.
@@ -72,6 +69,7 @@ mod test_utils {
         test_vector
             .append_blank_node(BlankNodeRef::new_unchecked("test1"))
             .unwrap();
+        test_vector.append_integer(Integer::from(2605)).unwrap();
         test_vector.append_float(Float::from(26.05)).unwrap();
         test_vector.append_boolean(Boolean::from(true)).unwrap();
         test_vector
@@ -129,5 +127,24 @@ mod test_utils {
         );
         let function_registry = DefaultRdfFusionFunctionRegistry::new(encodings);
         function_registry.udf(&FunctionName::Builtin(name)).unwrap()
+    }
+
+    pub(crate) fn create_compare_test_vector(
+        encoding: &TypedValueEncodingRef,
+    ) -> Vec<TypedValueArray> {
+        let mut vec1_builder = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
+        vec1_builder.append_integer(Integer::from(1)).unwrap();
+        vec1_builder.append_integer(Integer::from(2)).unwrap();
+        vec1_builder.append_integer(Integer::from(1)).unwrap();
+        let vec1 = vec1_builder.finish();
+
+        let mut vec2_builder = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
+        vec2_builder.append_integer(Integer::from(2)).unwrap();
+        vec2_builder.append_integer(Integer::from(1)).unwrap();
+        vec2_builder.append_integer(Integer::from(1)).unwrap();
+        let vec2 = vec2_builder.finish();
+
+        let vectors = vec![vec1, vec2];
+        vectors
     }
 }

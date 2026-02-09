@@ -69,3 +69,48 @@ impl ScalarSparqlOp for LessOrEqualSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_compare_test_vector, create_default_builtin_udf};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::TypedValueEncoding;
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_leq_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_compare_test_vector(&encoding);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::LessOrEqual);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-------------+-------------+------------------------------------+
+        | input1      | input2      | LEQ(?table?.input1,?table?.input2) |
+        +-------------+-------------+------------------------------------+
+        | {integer=1} | {integer=2} | {boolean=true}                     |
+        | {integer=2} | {integer=1} | {boolean=false}                    |
+        | {integer=1} | {integer=1} | {boolean=true}                     |
+        +-------------+-------------+------------------------------------+
+        "
+        )
+    }
+}
