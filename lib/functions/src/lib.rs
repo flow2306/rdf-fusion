@@ -69,6 +69,7 @@ mod test_utils {
             .unwrap();
         test_vector.append_decimal(Decimal::from(10)).unwrap();
         test_vector.append_string("String1", None).unwrap();
+        test_vector.append_string("01", None).unwrap();
         test_vector
             .append_blank_node(BlankNodeRef::new_unchecked("test1"))
             .unwrap();

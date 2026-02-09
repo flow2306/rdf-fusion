@@ -76,3 +76,188 @@ impl ScalarSparqlOp for CastFloatSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_default_builtin_udf, create_mixed_test_vector};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_cast_float_normal() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_mixed_test_vector(&encoding, None);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +----------------------------------------------------------------+--------------------------+
+        | input                                                          | xsd:float(?table?.input) |
+        +----------------------------------------------------------------+--------------------------+
+        | {named_node=http://example.com/test}                           | {null=}                  |
+        | {decimal=1000.0000000000000000}                                | {float=10.0}             |
+        | {string={value: String1, language: }}                          | {null=}                  |
+        | {string={value: 01, language: }}                               | {float=1.0}              |
+        | {blank_node=test1}                                             | {null=}                  |
+        | {integer=2605}                                                 | {float=2605.0}           |
+        | {float=26.05}                                                  | {float=26.05}            |
+        | {boolean=true}                                                 | {float=1.0}              |
+        | {date_time={value: 6389958449600.0000000000000000, offset: 0}} | {null=}                  |
+        | {time={value: 100.0000000000000000, offset: 60}}               | {null=}                  |
+        | {date={value: 6389953920000.0000000000000000, offset: }}       | {null=}                  |
+        | {duration={months: 7, seconds: 700.0000000000000000}}          | {null=}                  |
+        +----------------------------------------------------------------+--------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +----------------+--------------------------+
+        | input          | xsd:float(?table?.input) |
+        +----------------+--------------------------+
+        | {integer=2605} | {float=2605.0}           |
+        +----------------+--------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_fast_path_decimal() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Decimal));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------------------------+--------------------------+
+        | input                           | xsd:float(?table?.input) |
+        +---------------------------------+--------------------------+
+        | {decimal=1000.0000000000000000} | {float=1000.0}           |
+        +---------------------------------+--------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_fast_path_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------+--------------------------+
+        | input         | xsd:float(?table?.input) |
+        +---------------+--------------------------+
+        | {float=26.05} | {float=26.05}            |
+        +---------------+--------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_fast_path_string() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::String));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------------------------------+--------------------------+
+        | input                                 | xsd:float(?table?.input) |
+        +---------------------------------------+--------------------------+
+        | {string={value: String1, language: }} | {null=}                  |
+        | {string={value: 01, language: }}      | {float=1.0}              |
+        +---------------------------------------+--------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_fast_path_boolean() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Boolean));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::CastFloat);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +----------------+--------------------------+
+        | input          | xsd:float(?table?.input) |
+        +----------------+--------------------------+
+        | {boolean=true} | {float=1.0}              |
+        +----------------+--------------------------+
+        "
+        )
+    }
+}
