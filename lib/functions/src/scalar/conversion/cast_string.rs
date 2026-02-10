@@ -3,6 +3,7 @@ use rdf_fusion_encoding::RdfFusionEncodings;
 use rdf_fusion_model::ThinError;
 use rdf_fusion_model::{SimpleLiteral, TypedValue, TypedValueRef};
 
+use crate::scalar::conversion::common::try_cast_fast_path;
 use crate::scalar::dispatch::dispatch_unary_owned_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
@@ -11,7 +12,6 @@ use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
 use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
-use crate::scalar::conversion::common::try_cast_fast_path;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct CastStringSparqlOp;
@@ -112,7 +112,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -150,7 +150,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -177,7 +177,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -204,7 +204,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -231,7 +231,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -259,7 +259,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])

@@ -94,7 +94,9 @@ impl ScalarSparqlOp for AddSparqlOp {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{create_binary_numeric_mixed_test_vector, create_default_builtin_udf};
+    use crate::test_utils::{
+        create_binary_numeric_mixed_test_vector, create_default_builtin_udf,
+    };
     use datafusion::dataframe;
     use datafusion::logical_expr::col;
     use insta::assert_snapshot;
@@ -144,14 +146,17 @@ mod tests {
     #[tokio::test]
     async fn test_add_fast_path_integer() {
         let encoding = Arc::new(TypedValueEncoding::default());
-        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let test_vector = create_binary_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Integer),
+        );
         let udf = create_default_builtin_udf(encoding, BuiltinName::Add);
 
         let input = dataframe!(
             "input1" => test_vector[0].clone(),
             "input2" => test_vector[1].clone(),
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([
@@ -178,14 +183,17 @@ mod tests {
     #[tokio::test]
     async fn test_add_fast_path_float() {
         let encoding = Arc::new(TypedValueEncoding::default());
-        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let test_vector = create_binary_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Float),
+        );
         let udf = create_default_builtin_udf(encoding, BuiltinName::Add);
 
         let input = dataframe!(
             "input1" => test_vector[0].clone(),
             "input2" => test_vector[1].clone(),
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([

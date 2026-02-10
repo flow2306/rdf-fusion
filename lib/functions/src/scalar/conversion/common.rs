@@ -70,7 +70,10 @@ fn build_single_type_array(
                 None,
             );
             Ok(builder.with_strings(Arc::new(strings)))
-        },
-        _ => exec_err!("Unsupported field for numeric fast path: {:?}: in conversions/common.rs", field),
+        }
+        _ => exec_err!(
+            "Unsupported field for numeric fast path: {:?}: in conversions/common.rs",
+            field
+        ),
     }
 }

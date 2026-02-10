@@ -97,7 +97,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -135,7 +135,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -162,7 +162,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -189,7 +189,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -216,7 +216,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
@@ -244,7 +244,7 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
         let result = input
             .select([col("input"), udf.call(vec![col("input")])])
