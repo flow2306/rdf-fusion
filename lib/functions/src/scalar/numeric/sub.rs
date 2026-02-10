@@ -88,3 +88,121 @@ impl ScalarSparqlOp for SubSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_binary_numeric_mixed_test_vector, create_default_builtin_udf};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_sub_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, None);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Sub);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | SUB(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {integer=435}   | {integer=267}   | {integer=168}                      |
+        | {integer=245}   | {integer=155}   | {integer=90}                       |
+        | {integer=123}   | {integer=1777}  | {integer=-1654}                    |
+        | {integer=34}    | {integer=0}     | {integer=34}                       |
+        | {float=123.56}  | {float=594.39}  | {float=-470.83002}                 |
+        | {float=95.303}  | {float=234.134} | {float=-138.831}                   |
+        | {float=2658.48} | {float=26.4}    | {float=2632.08}                    |
+        | {float=3.14}    | {float=0.0}     | {float=3.14}                       |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_sub_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Sub);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------+----------------+------------------------------------+
+        | input1        | input2         | SUB(?table?.input1,?table?.input2) |
+        +---------------+----------------+------------------------------------+
+        | {integer=435} | {integer=267}  | {integer=168}                      |
+        | {integer=245} | {integer=155}  | {integer=90}                       |
+        | {integer=123} | {integer=1777} | {integer=-1654}                    |
+        | {integer=34}  | {integer=0}    | {integer=34}                       |
+        +---------------+----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_sub_fast_path_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Sub);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | SUB(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {float=123.56}  | {float=594.39}  | {float=-470.83002}                 |
+        | {float=95.303}  | {float=234.134} | {float=-138.831}                   |
+        | {float=2658.48} | {float=26.4}    | {float=2632.08}                    |
+        | {float=3.14}    | {float=0.0}     | {float=3.14}                       |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+}

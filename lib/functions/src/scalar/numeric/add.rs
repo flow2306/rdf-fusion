@@ -91,3 +91,121 @@ impl ScalarSparqlOp for AddSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_binary_numeric_mixed_test_vector, create_default_builtin_udf};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_add_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, None);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Add);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+        .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | ADD(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {integer=435}   | {integer=267}   | {integer=702}                      |
+        | {integer=245}   | {integer=155}   | {integer=400}                      |
+        | {integer=123}   | {integer=1777}  | {integer=1900}                     |
+        | {integer=34}    | {integer=0}     | {integer=34}                       |
+        | {float=123.56}  | {float=594.39}  | {float=717.95}                     |
+        | {float=95.303}  | {float=234.134} | {float=329.437}                    |
+        | {float=2658.48} | {float=26.4}    | {float=2684.88}                    |
+        | {float=3.14}    | {float=0.0}     | {float=3.14}                       |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_add_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Add);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------+----------------+------------------------------------+
+        | input1        | input2         | ADD(?table?.input1,?table?.input2) |
+        +---------------+----------------+------------------------------------+
+        | {integer=435} | {integer=267}  | {integer=702}                      |
+        | {integer=245} | {integer=155}  | {integer=400}                      |
+        | {integer=123} | {integer=1777} | {integer=1900}                     |
+        | {integer=34}  | {integer=0}    | {integer=34}                       |
+        +---------------+----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_add_fast_path_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Add);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | ADD(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {float=123.56}  | {float=594.39}  | {float=717.95}                     |
+        | {float=95.303}  | {float=234.134} | {float=329.437}                    |
+        | {float=2658.48} | {float=26.4}    | {float=2684.88}                    |
+        | {float=3.14}    | {float=0.0}     | {float=3.14}                       |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+}

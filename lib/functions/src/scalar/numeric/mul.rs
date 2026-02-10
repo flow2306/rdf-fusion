@@ -87,3 +87,122 @@ impl ScalarSparqlOp for MulSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_binary_numeric_mixed_test_vector, create_default_builtin_udf};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_mul_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, None);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Mul);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | MUL(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {integer=435}   | {integer=267}   | {integer=116145}                   |
+        | {integer=245}   | {integer=155}   | {integer=37975}                    |
+        | {integer=123}   | {integer=1777}  | {integer=218571}                   |
+        | {integer=34}    | {integer=0}     | {integer=0}                        |
+        | {float=123.56}  | {float=594.39}  | {float=73442.83}                   |
+        | {float=95.303}  | {float=234.134} | {float=22313.674}                  |
+        | {float=2658.48} | {float=26.4}    | {float=70183.87}                   |
+        | {float=3.14}    | {float=0.0}     | {float=0.0}                        |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_mul_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Mul);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------+----------------+------------------------------------+
+        | input1        | input2         | MUL(?table?.input1,?table?.input2) |
+        +---------------+----------------+------------------------------------+
+        | {integer=435} | {integer=267}  | {integer=116145}                   |
+        | {integer=245} | {integer=155}  | {integer=37975}                    |
+        | {integer=123} | {integer=1777} | {integer=218571}                   |
+        | {integer=34}  | {integer=0}    | {integer=0}                        |
+        +---------------+----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_mul_fast_path_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Mul);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | MUL(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {float=123.56}  | {float=594.39}  | {float=73442.83}                   |
+        | {float=95.303}  | {float=234.134} | {float=22313.674}                  |
+        | {float=2658.48} | {float=26.4}    | {float=70183.87}                   |
+        | {float=3.14}    | {float=0.0}     | {float=0.0}                        |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+}
+

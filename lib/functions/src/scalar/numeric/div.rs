@@ -82,3 +82,121 @@ impl ScalarSparqlOp for DivSparqlOp {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_binary_numeric_mixed_test_vector, create_default_builtin_udf};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_div_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, None);
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Div);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | DIV(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {integer=435}   | {integer=267}   | {decimal=162.9213483146067415}     |
+        | {integer=245}   | {integer=155}   | {decimal=158.0645161290322580}     |
+        | {integer=123}   | {integer=1777}  | {decimal=6.9217782779966235}       |
+        | {integer=34}    | {integer=0}     | {null=}                            |
+        | {float=123.56}  | {float=594.39}  | {float=0.20787698}                 |
+        | {float=95.303}  | {float=234.134} | {float=0.40704468}                 |
+        | {float=2658.48} | {float=26.4}    | {float=100.7}                      |
+        | {float=3.14}    | {float=0.0}     | {float=inf}                        |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_div_fast_path_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Div);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------+----------------+------------------------------------+
+        | input1        | input2         | DIV(?table?.input1,?table?.input2) |
+        +---------------+----------------+------------------------------------+
+        | {integer=435} | {integer=267}  | {decimal=162.9213483146067415}     |
+        | {integer=245} | {integer=155}  | {decimal=158.0645161290322580}     |
+        | {integer=123} | {integer=1777} | {decimal=6.9217782779966235}       |
+        | {integer=34}  | {integer=0}    | {null=}                            |
+        +---------------+----------------+------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_div_fast_path_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_binary_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Div);
+
+        let input = dataframe!(
+            "input1" => test_vector[0].clone(),
+            "input2" => test_vector[1].clone(),
+        )
+            .unwrap();
+
+        let result = input
+            .select([
+                col("input1"),
+                col("input2"),
+                udf.call(vec![col("input1"), col("input2")]),
+            ])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------+-----------------+------------------------------------+
+        | input1          | input2          | DIV(?table?.input1,?table?.input2) |
+        +-----------------+-----------------+------------------------------------+
+        | {float=123.56}  | {float=594.39}  | {float=0.20787698}                 |
+        | {float=95.303}  | {float=234.134} | {float=0.40704468}                 |
+        | {float=2658.48} | {float=26.4}    | {float=100.7}                      |
+        | {float=3.14}    | {float=0.0}     | {float=inf}                        |
+        +-----------------+-----------------+------------------------------------+
+        "
+        )
+    }
+}

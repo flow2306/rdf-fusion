@@ -151,4 +151,58 @@ mod test_utils {
         let vectors = vec![vec1, vec2];
         vectors
     }
+
+    pub(crate) fn create_binary_numeric_mixed_test_vector(
+        encoding: &TypedValueEncodingRef,
+        type_restriction: Option<TypedValueEncodingField>,
+    ) -> Vec<TypedValueArray> {
+        let mut vec1_builder = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
+        vec1_builder.append_integer(Integer::from(435)).unwrap();
+        vec1_builder.append_integer(Integer::from(245)).unwrap();
+        vec1_builder.append_integer(Integer::from(123)).unwrap();
+        vec1_builder.append_integer(Integer::from(34)).unwrap();
+        vec1_builder.append_float(Float::from(123.56)).unwrap();
+        vec1_builder.append_float(Float::from(95.303)).unwrap();
+        vec1_builder.append_float(Float::from(2658.48)).unwrap();
+        vec1_builder.append_float(Float::from(3.14)).unwrap();
+        let vec1 = vec1_builder.finish();
+
+        let mut vec2_builder = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
+        vec2_builder.append_integer(Integer::from(267)).unwrap();
+        vec2_builder.append_integer(Integer::from(155)).unwrap();
+        vec2_builder.append_integer(Integer::from(1777)).unwrap();
+        vec2_builder.append_integer(Integer::from(0)).unwrap();
+        vec2_builder.append_float(Float::from(594.39)).unwrap();
+        vec2_builder.append_float(Float::from(234.134)).unwrap();
+        vec2_builder.append_float(Float::from(26.4)).unwrap();
+        vec2_builder.append_float(Float::from(0.0)).unwrap();
+        let vec2 = vec2_builder.finish();
+
+        let vectors = vec![vec1, vec2];
+
+        match type_restriction {
+            None => vectors,
+            Some(type_restriction) => vectors
+                .into_iter()
+                .map(|vector| {
+                    let filter = vector
+                        .parts_as_ref()
+                        .array
+                        .type_ids()
+                        .iter()
+                        .map(|tid| Some(*tid == type_restriction.type_id()))
+                        .collect::<BooleanArray>();
+
+                    let array = vector.into_array_ref();
+                    let filtered = arrow::compute::filter(&array, &filter).unwrap();
+
+                    if filtered.is_empty() {
+                        panic!("Test vector is empty")
+                    }
+
+                    encoding.try_new_array(filtered).unwrap()
+                })
+                .collect(),
+        }
+    }
 }
