@@ -41,7 +41,7 @@ mod test_utils {
     use crate::registry::DefaultRdfFusionFunctionRegistry;
     use datafusion::arrow;
     use datafusion::arrow::array::{Array, BooleanArray};
-    use datafusion::logical_expr::ScalarUDF;
+    use datafusion::logical_expr::{AggregateUDF, ScalarUDF};
     use rdf_fusion_encoding::plain_term::PLAIN_TERM_ENCODING;
     use rdf_fusion_encoding::sortable_term::SORTABLE_TERM_ENCODING;
     use rdf_fusion_encoding::typed_value::{
@@ -133,6 +133,21 @@ mod test_utils {
         function_registry.udf(&FunctionName::Builtin(name)).unwrap()
     }
 
+    /// Creates an instance of the given builtin UDAF.
+    pub(crate) fn create_default_builtin_udaf(
+        typed_value_encoding: TypedValueEncodingRef,
+        name: BuiltinName,
+    ) -> Arc<AggregateUDF> {
+        let encodings = RdfFusionEncodings::new(
+            Arc::clone(&PLAIN_TERM_ENCODING),
+            typed_value_encoding,
+            None,
+            Arc::clone(&SORTABLE_TERM_ENCODING),
+        );
+        let function_registry = DefaultRdfFusionFunctionRegistry::new(encodings);
+        function_registry.udaf(&FunctionName::Builtin(name)).unwrap()
+    }
+
     pub(crate) fn create_compare_test_vector(
         encoding: &TypedValueEncodingRef,
     ) -> Vec<TypedValueArray> {
@@ -203,6 +218,42 @@ mod test_utils {
                     encoding.try_new_array(filtered).unwrap()
                 })
                 .collect(),
+        }
+    }
+
+    pub(crate) fn create_numeric_mixed_test_vector(
+        encoding: &TypedValueEncodingRef,
+        type_restriction: Option<TypedValueEncodingField>,
+    ) -> TypedValueArray {
+        let mut test_vector = TypedValueArrayElementBuilder::new(Arc::clone(encoding));
+        test_vector.append_decimal(Decimal::from(10)).unwrap();
+        test_vector.append_integer(Integer::from(2605)).unwrap();
+        test_vector.append_integer(Integer::from(256)).unwrap();
+        test_vector.append_integer(Integer::from(6685)).unwrap();
+        test_vector.append_float(Float::from(26.05)).unwrap();
+        test_vector.append_float(Float::from(3.14)).unwrap();
+        test_vector.append_float(Float::from(9.81)).unwrap();
+        let vector = test_vector.finish();
+
+        match type_restriction {
+            None => vector,
+            Some(type_restriction) => {
+                let filter = vector
+                    .parts_as_ref()
+                    .array
+                    .type_ids()
+                    .iter()
+                    .map(|tid| Some(*tid == type_restriction.type_id()))
+                    .collect::<BooleanArray>();
+                let array = vector.into_array_ref();
+                let filtered = arrow::compute::filter(&array, &filter).unwrap();
+
+                if filtered.is_empty() {
+                    panic!("Test vector is empty")
+                }
+
+                encoding.try_new_array(filtered).unwrap()
+            }
         }
     }
 }

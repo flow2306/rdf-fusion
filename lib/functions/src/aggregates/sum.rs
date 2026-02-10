@@ -49,27 +49,40 @@ impl Accumulator for SparqlTypedValueSum {
 
         let arr = self.encoding.try_new_array(Arc::clone(&values[0]))?;
 
+        // local helper closure for fast paths
+        let mut add_numeric = |rhs: Numeric| {
+            if let Ok(lhs) = self.sum {
+                self.sum = match NumericPair::with_casts_from(
+                    lhs,
+                    rhs,
+                ) {
+                    NumericPair::Int(lhs, rhs) => {
+                        lhs.checked_add(rhs).map(Numeric::Int)
+                    }
+                    NumericPair::Integer(lhs, rhs) => {
+                        lhs.checked_add(rhs).map(Numeric::Integer)
+                    }
+                    NumericPair::Float(lhs, rhs) => Ok(Numeric::Float(lhs + rhs)),
+                    NumericPair::Double(lhs, rhs) => Ok(Numeric::Double(lhs + rhs)),
+                    NumericPair::Decimal(lhs, rhs) => {
+                        lhs.checked_add(rhs).map(Numeric::Decimal)
+                    }
+                };
+            }
+        };
+
         // fast path if values are homogenous float
         if arr.parts_as_ref().array.len() == arr.parts_as_ref().floats.len() {
             if let Some(batch_sum) = sum(arr.parts_as_ref().floats) {
-                if let Ok(sum) = self.sum {
-                    self.sum = match NumericPair::with_casts_from(
-                        sum,
-                        Numeric::from(Float::from(batch_sum)),
-                    ) {
-                        NumericPair::Int(lhs, rhs) => {
-                            lhs.checked_add(rhs).map(Numeric::Int)
-                        }
-                        NumericPair::Integer(lhs, rhs) => {
-                            lhs.checked_add(rhs).map(Numeric::Integer)
-                        }
-                        NumericPair::Float(lhs, rhs) => Ok(Numeric::Float(lhs + rhs)),
-                        NumericPair::Double(lhs, rhs) => Ok(Numeric::Double(lhs + rhs)),
-                        NumericPair::Decimal(lhs, rhs) => {
-                            lhs.checked_add(rhs).map(Numeric::Decimal)
-                        }
-                    };
-                }
+                add_numeric(Numeric::from(Float::from(batch_sum)));
+            }
+            return Ok(());
+        }
+
+        // fast path if values are homogenous integers
+        if arr.parts_as_ref().array.len() == arr.parts_as_ref().integers.len() {
+            if let Some(batch_sum) = sum(arr.parts_as_ref().integers) {
+                add_numeric(Numeric::from(Integer::from(batch_sum)));
             }
             return Ok(());
         }
@@ -118,5 +131,95 @@ impl Accumulator for SparqlTypedValueSum {
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
         self.update_batch(states)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{create_default_builtin_udaf, create_numeric_mixed_test_vector};
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_sum_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(&encoding, None);
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Sum);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input.
+            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +--------------------+
+        | SUM(?table?.input) |
+        +--------------------+
+        | {float=9594.999}   |
+        +--------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_sum_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Sum);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input.
+            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +--------------------+
+        | SUM(?table?.input) |
+        +--------------------+
+        | {float=39.0}       |
+        +--------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_sum_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Sum);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+            .unwrap();
+
+        let result = input.
+            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +--------------------+
+        | SUM(?table?.input) |
+        +--------------------+
+        | {integer=9546}     |
+        +--------------------+
+        "
+        )
     }
 }
