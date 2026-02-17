@@ -19,13 +19,14 @@ pub fn try_cast_fast_path(
     let col = args.args[0].to_array();
     let parts = col.parts_as_ref();
 
+    // candidates are convertible if homogenous
     let candidates: &[&dyn Array] = &[
         parts.booleans,
         parts.ints,
         parts.integers,
         parts.floats,
         parts.doubles,
-        parts.decimals,
+        // parts.decimals,
         // parts.strings.value, // results in unexpected behavior
     ];
 

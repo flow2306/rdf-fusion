@@ -145,7 +145,9 @@ mod test_utils {
             Arc::clone(&SORTABLE_TERM_ENCODING),
         );
         let function_registry = DefaultRdfFusionFunctionRegistry::new(encodings);
-        function_registry.udaf(&FunctionName::Builtin(name)).unwrap()
+        function_registry
+            .udaf(&FunctionName::Builtin(name))
+            .unwrap()
     }
 
     pub(crate) fn create_compare_test_vector(

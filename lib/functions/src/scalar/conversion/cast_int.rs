@@ -51,7 +51,7 @@ impl ScalarSparqlOp for CastIntSparqlOp {
                 )? {
                     return Ok(result);
                 }
-                print!("hhhh00");
+
                 dispatch_unary_typed_value(
                     &args.encoding,
                     &args.args[0],

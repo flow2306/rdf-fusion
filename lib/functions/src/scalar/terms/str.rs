@@ -294,6 +294,8 @@ fn try_str_fast_path(
         return Ok(Some(ColumnarValue::Array(result.unwrap().into_array_ref())));
     }
 
+    // decimal values get converted wrong; check intern encoding of decimal
+    /*
     if parts.array.len() == parts.decimals.len() {
         let utf8_arr = compute::cast(parts.decimals as &dyn Array, &DataType::Utf8)?;
         let language_arr = Arc::new(StringArray::new_null(parts.decimals.len()));
@@ -311,6 +313,7 @@ fn try_str_fast_path(
         .finish();
         return Ok(Some(ColumnarValue::Array(result.unwrap().into_array_ref())));
     }
+     */
 
     if parts.array.len() == parts.strings.value.len() {
         let strings = StructArray::new(
@@ -406,6 +409,33 @@ mod tests {
         +--------------------------------------+-------------------------------------------------------+
         | {named_node=http://example.com/test} | {string={value: http://example.com/test, language: }} |
         +--------------------------------------+-------------------------------------------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_str_fast_path_decimal() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector =
+            create_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Decimal));
+        let udf = create_default_builtin_udf(encoding, BuiltinName::Str);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+        .unwrap();
+
+        let result = input
+            .select([col("input"), udf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +---------------------------------+-----------------------------------------------------+
+        | input                           | STR(?table?.input)                                  |
+        +---------------------------------+-----------------------------------------------------+
+        | {decimal=1000.0000000000000000} | {string={value: 1000.0000000000000000, language: }} |
+        +---------------------------------+-----------------------------------------------------+
         "
         )
     }

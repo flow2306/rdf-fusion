@@ -1,12 +1,10 @@
-use crate::scalar::conversion::common::try_cast_fast_path;
 use crate::scalar::dispatch::dispatch_unary_typed_value;
 use crate::scalar::sparql_op_impl::{
     ScalarSparqlOpImpl, create_typed_value_sparql_op_impl,
 };
 use crate::scalar::{ScalarSparqlOp, ScalarSparqlOpSignature, SparqlOpArity};
-use datafusion::arrow::datatypes::DataType;
 use rdf_fusion_encoding::RdfFusionEncodings;
-use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+use rdf_fusion_encoding::typed_value::{TypedValueEncoding};
 use rdf_fusion_extensions::functions::BuiltinName;
 use rdf_fusion_extensions::functions::FunctionName;
 use rdf_fusion_model::{Decimal, Numeric, ThinError, TypedValueRef};
@@ -44,6 +42,7 @@ impl ScalarSparqlOp for CastDecimalSparqlOp {
         Some(create_typed_value_sparql_op_impl(
             encodings.typed_value(),
             |args| {
+                /*
                 if let Some(result) = try_cast_fast_path(
                     &args,
                     DataType::Decimal128(Decimal::PRECISION, Decimal::SCALE),
@@ -51,6 +50,7 @@ impl ScalarSparqlOp for CastDecimalSparqlOp {
                 )? {
                     return Ok(result);
                 }
+                 */
 
                 dispatch_unary_typed_value(
                     &args.encoding,

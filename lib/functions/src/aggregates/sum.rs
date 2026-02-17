@@ -52,13 +52,8 @@ impl Accumulator for SparqlTypedValueSum {
         // local helper closure for fast paths
         let mut add_numeric = |rhs: Numeric| {
             if let Ok(lhs) = self.sum {
-                self.sum = match NumericPair::with_casts_from(
-                    lhs,
-                    rhs,
-                ) {
-                    NumericPair::Int(lhs, rhs) => {
-                        lhs.checked_add(rhs).map(Numeric::Int)
-                    }
+                self.sum = match NumericPair::with_casts_from(lhs, rhs) {
+                    NumericPair::Int(lhs, rhs) => lhs.checked_add(rhs).map(Numeric::Int),
                     NumericPair::Integer(lhs, rhs) => {
                         lhs.checked_add(rhs).map(Numeric::Integer)
                     }
@@ -136,7 +131,9 @@ impl Accumulator for SparqlTypedValueSum {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{create_default_builtin_udaf, create_numeric_mixed_test_vector};
+    use crate::test_utils::{
+        create_default_builtin_udaf, create_numeric_mixed_test_vector,
+    };
     use datafusion::dataframe;
     use datafusion::logical_expr::col;
     use insta::assert_snapshot;
@@ -154,10 +151,10 @@ mod tests {
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
-        let result = input.
-            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
             .unwrap();
         assert_snapshot!(
             result.to_string().await.unwrap(),
@@ -174,16 +171,19 @@ mod tests {
     #[tokio::test]
     async fn test_sum_float() {
         let encoding = Arc::new(TypedValueEncoding::default());
-        let test_vector = create_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Float));
+        let test_vector = create_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Float),
+        );
         let udaf = create_default_builtin_udaf(encoding, BuiltinName::Sum);
 
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
-        let result = input.
-            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
             .unwrap();
         assert_snapshot!(
             result.to_string().await.unwrap(),
@@ -200,16 +200,19 @@ mod tests {
     #[tokio::test]
     async fn test_sum_integer() {
         let encoding = Arc::new(TypedValueEncoding::default());
-        let test_vector = create_numeric_mixed_test_vector(&encoding, Some(TypedValueEncodingField::Integer));
+        let test_vector = create_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Integer),
+        );
         let udaf = create_default_builtin_udaf(encoding, BuiltinName::Sum);
 
         let input = dataframe!(
             "input" => test_vector,
         )
-            .unwrap();
+        .unwrap();
 
-        let result = input.
-            aggregate(vec![], vec![udaf.call(vec![col("input")])])
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
             .unwrap();
         assert_snapshot!(
             result.to_string().await.unwrap(),

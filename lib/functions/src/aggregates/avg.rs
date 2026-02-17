@@ -1,4 +1,5 @@
 use datafusion::arrow::array::{Array, ArrayRef, AsArray};
+use datafusion::arrow::compute::sum;
 use datafusion::arrow::datatypes::{DataType, UInt64Type};
 use datafusion::common::exec_datafusion_err;
 use datafusion::logical_expr::{AggregateUDF, Volatility, create_udaf};
@@ -14,7 +15,7 @@ use rdf_fusion_encoding::{
     EncodingArray, EncodingScalar, TermDecoder, TermEncoder, TermEncoding,
 };
 use rdf_fusion_extensions::functions::BuiltinName;
-use rdf_fusion_model::DFResult;
+use rdf_fusion_model::{DFResult, Float};
 use rdf_fusion_model::{Decimal, Integer, Numeric, NumericPair, ThinError, ThinResult};
 use std::ops::Div;
 use std::sync::Arc;
@@ -57,6 +58,39 @@ impl Accumulator for SparqlAvg {
         let arr_len = u64::try_from(arr.array().len())
             .map_err(|_| exec_datafusion_err!("Array was too large."))?;
         self.count += arr_len;
+
+        // local helper closure for fast paths
+        let mut add_numeric = |rhs: Numeric| {
+            if let Ok(lhs) = self.sum {
+                self.sum = match NumericPair::with_casts_from(lhs, rhs) {
+                    NumericPair::Int(lhs, rhs) => lhs.checked_add(rhs).map(Numeric::Int),
+                    NumericPair::Integer(lhs, rhs) => {
+                        lhs.checked_add(rhs).map(Numeric::Integer)
+                    }
+                    NumericPair::Float(lhs, rhs) => Ok(Numeric::Float(lhs + rhs)),
+                    NumericPair::Double(lhs, rhs) => Ok(Numeric::Double(lhs + rhs)),
+                    NumericPair::Decimal(lhs, rhs) => {
+                        lhs.checked_add(rhs).map(Numeric::Decimal)
+                    }
+                };
+            }
+        };
+
+        // fast path if values are homogenous float
+        if arr.parts_as_ref().array.len() == arr.parts_as_ref().floats.len() {
+            if let Some(batch_sum) = sum(arr.parts_as_ref().floats) {
+                add_numeric(Numeric::from(Float::from(batch_sum)));
+            }
+            return Ok(());
+        }
+
+        // fast path if values are homogenous integers
+        if arr.parts_as_ref().array.len() == arr.parts_as_ref().integers.len() {
+            if let Some(batch_sum) = sum(arr.parts_as_ref().integers) {
+                add_numeric(Numeric::from(Integer::from(batch_sum)));
+            }
+            return Ok(());
+        }
 
         for value in NumericTermValueDecoder::decode_terms(&arr) {
             if let Ok(sum) = self.sum {
@@ -181,5 +215,103 @@ impl Accumulator for SparqlAvg {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{
+        create_default_builtin_udaf, create_numeric_mixed_test_vector,
+    };
+    use datafusion::dataframe;
+    use datafusion::logical_expr::col;
+    use insta::assert_snapshot;
+    use rdf_fusion_encoding::EncodingArray;
+    use rdf_fusion_encoding::typed_value::{TypedValueEncoding, TypedValueEncodingField};
+    use rdf_fusion_extensions::functions::BuiltinName;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_avg_mixed() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(&encoding, None);
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Avg);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+        .unwrap();
+
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +--------------------+
+        | AVG(?table?.input) |
+        +--------------------+
+        | {float=1370.7141}  |
+        +--------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_avg_float() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Float),
+        );
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Avg);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+        .unwrap();
+
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +--------------------+
+        | AVG(?table?.input) |
+        +--------------------+
+        | {float=13.0}       |
+        +--------------------+
+        "
+        )
+    }
+
+    #[tokio::test]
+    async fn test_avg_integer() {
+        let encoding = Arc::new(TypedValueEncoding::default());
+        let test_vector = create_numeric_mixed_test_vector(
+            &encoding,
+            Some(TypedValueEncodingField::Integer),
+        );
+        let udaf = create_default_builtin_udaf(encoding, BuiltinName::Avg);
+
+        let input = dataframe!(
+            "input" => test_vector,
+        )
+        .unwrap();
+
+        let result = input
+            .aggregate(vec![], vec![udaf.call(vec![col("input")])])
+            .unwrap();
+        assert_snapshot!(
+            result.to_string().await.unwrap(),
+            @"
+        +-----------------------------------+
+        | AVG(?table?.input)                |
+        +-----------------------------------+
+        | {decimal=318200.0000000000000000} |
+        +-----------------------------------+
+        "
+        )
     }
 }
